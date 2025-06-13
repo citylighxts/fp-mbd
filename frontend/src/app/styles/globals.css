@@ -1,30 +1,73 @@
-/* @import "tailwindcss"; */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Custom scrollbar for better aesthetics */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ensure Inter font is loaded and applied if not via Tailwind */
+html {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Base styles for rounded corners and shadows, generally applied */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply antialiased;
+}
+
+.card {
+  @apply bg-white p-6 rounded-lg shadow-md;
+}
+
+.btn-primary {
+  @apply bg-primary text-white py-2 px-4 rounded-md hover:bg-opacity-90 transition duration-200;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-white py-2 px-4 rounded-md hover:bg-opacity-90 transition duration-200;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+select,
+textarea {
+  @apply w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+}
+
+label {
+  @apply block text-gray-700 text-sm font-bold mb-2;
+}
+
+/* General button styling */
+button {
+  @apply cursor-pointer;
+}
+
+/* Responsive utility classes for common elements */
+@media (max-width: 768px) {
+  .container {
+    @apply px-2;
+  }
+  .card {
+    @apply p-4;
+  }
 }
