@@ -26,9 +26,9 @@ export default function KonselorPanel() {
   const [allTopiks, setAllTopiks] = useState<Topik[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('');
+  const [messageType, setMessageType] = useState<'' | 'success' | 'error' | 'info'>('');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [modalType, setModalType] = useState<'editSesi' | 'manageTopics'>('');
+  const [modalType, setModalType] = useState<'' | 'editSesi' | 'manageTopics'>('');
   const [currentItem, setCurrentItem] = useState<Sesi | null>(null); // Sesi yang sedang diedit
   const [formSesiValues, setFormSesiValues] = useState<SesiFormValues>({
     status: 'Requested',
@@ -262,7 +262,7 @@ export default function KonselorPanel() {
     <div className="p-4 md:p-8">
       <h1 className="text-4xl font-extrabold text-primary mb-8 text-center">Dashboard Konselor</h1>
 
-      {message && <MessageDisplay message={message} type={messageType} />}
+      {message && messageType && <MessageDisplay message={message} type={messageType} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="card">
@@ -322,7 +322,7 @@ export default function KonselorPanel() {
             <h3 className="text-2xl font-bold mb-4 text-primary">
               {modalType === 'editSesi' ? `Edit Sesi ID: ${currentItem?.sesi_id}` : 'Kelola Topik Konseling Anda'}
             </h3>
-            {message && <MessageDisplay message={message} type={messageType} />}
+            {message && messageType && <MessageDisplay message={message} type={messageType} />}
             {renderModalContent()}
           </div>
         </div>

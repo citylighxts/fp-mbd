@@ -48,9 +48,9 @@ export default function AdminPanel() {
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [modalType, setModalType] = useState<'add' | 'edit' | 'delete'>('');
+  const [modalType, setModalType] = useState<'add' | 'edit' | 'delete' | null>(null);
   const [currentItem, setCurrentItem] = useState<User | Admin | Mahasiswa | Konselor | Topik | Sesi | null>(null);
 
   const [formValues, setFormValues] = useState<FormValues>({
@@ -71,26 +71,25 @@ export default function AdminPanel() {
   const fetchData = async (tab: keyof AdminDataState) => {
     setLoading(true);
     setMessage('');
-    setMessageType('');
+    setMessageType('info');
     try {
-      let response;
       if (tab === 'users') {
-        response = await api.get<User[]>('/api/users'); // Tentukan tipe respons
+        const response = await api.get<User[]>('/api/users'); // Tentukan tipe respons
         setData(prev => ({ ...prev, users: response.data }));
       } else if (tab === 'admins') {
-        response = await api.get<Admin[]>('/api/admins');
+        const response = await api.get<Admin[]>('/api/admins');
         setData(prev => ({ ...prev, admins: response.data }));
       } else if (tab === 'mahasiswas') {
-        response = await api.get<Mahasiswa[]>('/api/mahasiswas');
+        const response = await api.get<Mahasiswa[]>('/api/mahasiswas');
         setData(prev => ({ ...prev, mahasiswas: response.data }));
       } else if (tab === 'konselors') {
-        response = await api.get<Konselor[]>('/api/konselors');
+        const response = await api.get<Konselor[]>('/api/konselors');
         setData(prev => ({ ...prev, konselors: response.data }));
       } else if (tab === 'topics') {
-        response = await api.get<Topik[]>('/api/topiks');
+        const response = await api.get<Topik[]>('/api/topiks');
         setData(prev => ({ ...prev, topics: response.data }));
       } else if (tab === 'sessions') {
-        response = await api.get<Sesi[]>('/api/sesi/all');
+        const response = await api.get<Sesi[]>('/api/sesi/all');
         setData(prev => ({ ...prev, sessions: response.data }));
       }
       setMessage(`Data ${tab} berhasil dimuat.`);
@@ -139,7 +138,7 @@ export default function AdminPanel() {
       status: '', catatan: ''
     });
     setMessage('');
-    setMessageType('');
+    setMessageType('info');
   };
 
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -151,7 +150,7 @@ export default function AdminPanel() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-    setMessageType('');
+    setMessageType('info');
 
     try {
       if (modalType === 'add') {

@@ -15,7 +15,9 @@ export default function MahasiswaPanel() {
   const [sesi, setSesi] = useState<Sesi[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info' | ''>('');
+  const [modalMessage, setModalMessage] = useState<string>('');
+  const [modalMessageType, setModalMessageType] = useState<'success' | 'error' | 'info' | ''>('');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedKonselor, setSelectedKonselor] = useState<string>('');
   const [selectedTopik, setSelectedTopik] = useState<string>('');
@@ -57,22 +59,22 @@ export default function MahasiswaPanel() {
   const handleRequestSesi = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage('');
-    setMessageType('');
+    setModalMessage('');
+    setModalMessageType('');
 
     try {
       await api.post('/api/sesi', {
         konselor_nik: selectedKonselor,
         topik_id: selectedTopik,
       });
-      setMessage('Permintaan sesi berhasil diajukan!');
-      setMessageType('success');
+      setModalMessage('Permintaan sesi berhasil diajukan!');
+      setModalMessageType('success');
+      await fetchMahasiswaData(); // Refresh data sesi
       closeModal();
-      fetchMahasiswaData(); // Refresh data sesi
     } catch (error: any) {
       console.error('Error requesting session:', error);
-      setMessage(error.response?.data?.message || 'Gagal mengajukan permintaan sesi.');
-      setMessageType('error');
+      setModalMessage(error.response?.data?.message || 'Gagal mengajukan permintaan sesi.');
+      setModalMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -82,13 +84,15 @@ export default function MahasiswaPanel() {
     setIsModalOpen(false);
     setSelectedKonselor('');
     setSelectedTopik('');
+    setModalMessage('');
+    setModalMessageType('');
   };
 
   return (
     <div className="p-4 md:p-8">
       <h1 className="text-4xl font-extrabold text-primary mb-8 text-center">Dashboard Mahasiswa</h1>
 
-      {message && <MessageDisplay message={message} type={messageType} />}
+      {message && messageType && <MessageDisplay message={message} type={messageType} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="card">
@@ -161,7 +165,12 @@ export default function MahasiswaPanel() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
             <h3 className="text-2xl font-bold mb-4 text-primary">Ajukan Sesi Konseling Baru</h3>
-            {message && <MessageDisplay message={message} type={messageType} />}
+            {modalMessage && modalMessageType && (
+              <MessageDisplay
+                message={modalMessage}
+                type={modalMessageType}
+              />
+            )}
             <form onSubmit={handleRequestSesi} className="space-y-4">
               <div>
                 <label htmlFor="konselor">Pilih Konselor:</label>
