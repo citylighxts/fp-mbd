@@ -28,7 +28,8 @@ build/
 out/ # Jika Next.js di-export sebagai static HTML
 
 # Next.js specific
-.next/ # Direktori build Next.js
+.next/
+frontend/.next/
 .swc/ # Cache SWC transpiler
 next-env.d.ts # Ini sering di-generate otomatis, jika Anda sudah punya yang custom atau tidak mau di-generate ulang, bisa dihapus dari sini.
              # Namun, secara default dari `create-next-app`, ini masuk ke gitignore.
