@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 
 // Buat instance Axios
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000/api', // Ganti dengan URL backend Anda
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001/api', // Ganti dengan URL backend Anda
   headers: {
     'Content-Type': 'application/json',
   },
