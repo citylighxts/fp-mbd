@@ -13,19 +13,20 @@ const protect = (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
             // Lampirkan user dari token ke request
-            req.user = decoded; // decoded akan berisi { user_id, role, iat, exp }
-            next();
+            req.user = decoded;
+            
+            // Lanjutkan ke middleware selanjutnya dan HENTIKAN eksekusi fungsi ini
+            return next(); 
+
         } catch (error) {
-            console.error(error);
-            res.status(401).json({ message: 'Tidak diotorisasi, token gagal' });
+            // Jika token gagal diverifikasi, kirim error dan HENTIKAN eksekusi
+            console.error('Token verification failed:', error.message);
+            return res.status(401).json({ message: 'Tidak diotorisasi, token gagal' });
         }
     }
 
-    if (!token) {
-        res.status(401).json({ message: 'Tidak diotorisasi, tidak ada token' });
-    }
+    return res.status(401).json({ message: 'Tidak diotorisasi, tidak ada token' });
 };
-
 const authorizeRoles = (...roles) => {
     return (req, res, next) => {
         if (!req.user || !roles.includes(req.user.role)) {

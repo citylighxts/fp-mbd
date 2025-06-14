@@ -16,6 +16,7 @@ const generateCharId = () => {
 
 const registerUser = async (req, res) => {
     const { username, password, role, nama, departemen, kontak, spesialisasi, NRP, NIK } = req.body;
+    console.log(`[REGISTER DEBUG] Password untuk user '${username}': "${password}" (Panjang: ${password.length})`);
     console.log('--- Register Request Received ---');
     console.log('Register request data:', { username, role, nama, NRP, NIK });
 
@@ -123,6 +124,7 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
     const { username, password } = req.body;
+    console.log(`[LOGIN DEBUG] Password untuk user '${username}': "${password}" (Panjang: ${password.length})`);
     console.log('--- Login Request Received ---');
     console.log('Attempting login for username:', username);
     // HATI-HATI: JANGAN LOG PASSWORD ASLI DI PRODUKSI. HANYA UNTUK DEBUGGING.
