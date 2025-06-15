@@ -75,15 +75,25 @@ const registerUser = async (req, res) => {
                 await client.query(konselorInsertQuery, [NIK, nama, spesialisasi, kontak, newUserId]);
                 console.log('Konselor data inserted.');
             } else if (role === 'Admin') {
-                let admin_id;
-                let isAdminIdUnique = false;
-                while (!isAdminIdUnique) {
-                    admin_id = generateCharId();
-                    const adminExists = await db.query('SELECT 1 FROM Admin WHERE admin_id = $1', [admin_id]);
-                    if (adminExists.rows.length === 0) {
-                        isAdminIdUnique = true;
-                    }
+                // Generate admin_id urut (A001, A002, dst)
+                const nextIdResult = await db.query(`
+                    SELECT
+                        LPAD((
+                            SELECT MIN(t.missing_id)
+                            FROM (
+                                SELECT generate_series(1, COALESCE(MAX(CAST(SUBSTRING(admin_id, 2) AS INTEGER)), 0) + 1) AS missing_id
+                                FROM Admin
+                            ) t
+                            LEFT JOIN Admin a ON t.missing_id = CAST(SUBSTRING(a.admin_id, 2) AS INTEGER)
+                            WHERE a.admin_id IS NULL
+                        )::text, 3, '0') AS next_admin_num
+                `);
+                let nextAdminNum = '001';
+                if (nextIdResult.rows.length > 0 && nextIdResult.rows[0].next_admin_num) {
+                    nextAdminNum = nextIdResult.rows[0].next_admin_num;
                 }
+                const admin_id = 'A' + nextAdminNum;
+
                 const adminInsertQuery = `
                     INSERT INTO Admin (admin_id, nama, User_user_id)
                     VALUES ($1, $2, $3);

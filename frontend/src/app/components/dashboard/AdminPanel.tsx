@@ -64,6 +64,16 @@ export default function AdminPanel() {
     sessions: [],
   });
   const [loading, setLoading] = useState<boolean>(false);
+
+  const [spesialisasiFilter, setSpesialisasiFilter] = useState<string>("");
+  const [filteredSessions, setFilteredSessions] = useState<Sesi[]>([]);
+  const [isFiltering, setIsFiltering] = useState<boolean>(false);
+
+  const [periode, setPeriode] = useState({ start: "", end: "" });
+  const [sesiSelesai, setSesiSelesai] = useState<Sesi[]>([]);
+  const [loadingSelesai, setLoadingSelesai] = useState(false);
+  const [pesanSelesai, setPesanSelesai] = useState("");
+
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">(
     "info"
@@ -131,6 +141,61 @@ export default function AdminPanel() {
       fetchData(activeTab);
     }
   }, [user, activeTab]);
+
+  const fetchSessionsBySpesialisasi = async () => {
+    if (!spesialisasiFilter) {
+      setMessage("Masukkan spesialisasi konselor yang ingin dicari.");
+      setMessageType("error");
+      return;
+    }
+    setIsFiltering(true);
+    setMessage("");
+    setMessageType("info");
+    try {
+      const response = await api.get<Sesi[]>(
+        `/sesi/spesialisasi?spesialisasi=${encodeURIComponent(spesialisasiFilter)}`
+      );
+      setFilteredSessions(response.data);
+      setMessage(
+        `Menampilkan sesi untuk konselor dengan spesialisasi "${spesialisasiFilter}".`
+      );
+      setMessageType("success");
+    } catch (error: any) {
+      setFilteredSessions([]);
+      setMessage(
+        error.response?.data?.message ||
+          "Gagal memuat sesi untuk spesialisasi ini."
+      );
+      setMessageType("error");
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+  const fetchSesiSelesai = async () => {
+    if (!periode.start || !periode.end) {
+      setPesanSelesai("Pilih tanggal mulai dan akhir periode.");
+      return;
+    }
+    setLoadingSelesai(true);
+    setPesanSelesai("");
+    try {
+      const response = await api.get<Sesi[]>(
+        `/sesi/konselor/selesai?start=${periode.start}&end=${periode.end}`
+      );
+      setSesiSelesai(response.data);
+      if (response.data.length === 0) {
+        setPesanSelesai("Tidak ada sesi selesai pada periode ini.");
+      }
+    } catch (err: any) {
+      setPesanSelesai("Gagal memuat data sesi selesai.");
+      setSesiSelesai([]);
+    } finally {
+      setLoadingSelesai(false);
+    }
+  };
+
+
 
   const openModal = (type: "add" | "edit" | "delete", item: any = null) => {
     setModalType(type);
@@ -255,7 +320,10 @@ export default function AdminPanel() {
         }
       } else if (modalType === "delete") {
         if (activeTab === "users" && currentItem && "user_id" in currentItem) {
-          await api.delete(`/users/${currentItem.user_id}`);
+          const token = localStorage.getItem("token"); // tambahkan ini
+          await api.delete(`/users/${currentItem.user_id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
           setMessage("Pengguna berhasil dihapus!");
         } else if (
           activeTab === "admins" &&
@@ -731,6 +799,104 @@ export default function AdminPanel() {
           </button>
         )}
 
+{activeTab === "sessions" && (
+  <>
+    {/* --- FILTER SPESIALISASI --- */}
+    <div className="mb-4 flex flex-col md:flex-row md:items-end gap-2">
+      <div>
+        <label htmlFor="spesialisasiFilter" className="block text-sm font-medium text-gray-700">
+          Filter Sesi Konseling Berdasarkan Spesialisasi Konselor:
+        </label>
+        <input
+          id="spesialisasiFilter"
+          type="text"
+          className="border rounded px-2 py-1 w-60"
+          placeholder="Masukkan spesialisasi, misal: Masalah Akademik"
+          value={spesialisasiFilter}
+          onChange={(e) => setSpesialisasiFilter(e.target.value)}
+        />
+      </div>
+      <button
+        className="btn-primary mt-2 md:mt-0"
+        onClick={fetchSessionsBySpesialisasi}
+        disabled={isFiltering}
+      >
+        {isFiltering ? "Memuat..." : "Tampilkan Sesi"}
+      </button>
+      {filteredSessions.length > 0 && (
+        <button
+          className="btn-secondary ml-2"
+          onClick={() => {
+            setFilteredSessions([]);
+            setSpesialisasiFilter("");
+            setMessage("");
+          }}
+        >
+          Reset Filter
+        </button>
+      )}
+    </div>
+
+    {/* --- LANGSUNG TAMBAHKAN KODE FILTER PERIODE DI SINI --- */}
+    <div className="mb-4 flex flex-col md:flex-row gap-2 items-end">
+      <div>
+        <label className="block text-sm font-medium">Periode Mulai:</label>
+        <input
+          type="date"
+          value={periode.start}
+          onChange={e => setPeriode(p => ({ ...p, start: e.target.value }))}
+          className="border rounded px-2 py-1"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium">Periode Akhir:</label>
+        <input
+          type="date"
+          value={periode.end}
+          onChange={e => setPeriode(p => ({ ...p, end: e.target.value }))}
+          className="border rounded px-2 py-1"
+        />
+      </div>
+      <button
+        className="btn-primary mt-2 md:mt-0"
+        onClick={fetchSesiSelesai}
+        disabled={loadingSelesai}
+      >
+        {loadingSelesai ? "Memuat..." : "Tampilkan Sesi Selesai"}
+      </button>
+    </div>
+
+    {pesanSelesai && (
+      <div className="mb-2 text-sm text-red-600">{pesanSelesai}</div>
+    )}
+
+    {!loadingSelesai && sesiSelesai.length > 0 && (
+      <div className="overflow-x-auto mb-6">
+        <table className="min-w-full bg-white border border-gray-200 rounded-md">
+          <thead>
+            <tr>
+              <th className="py-2 px-4 border-b">Tanggal</th>
+              <th className="py-2 px-4 border-b">Mahasiswa</th>
+              <th className="py-2 px-4 border-b">Topik</th>
+              <th className="py-2 px-4 border-b">Catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sesiSelesai.map(sesi => (
+              <tr key={sesi.sesi_id}>
+                <td className="py-2 px-4 border-b">{sesi.tanggal}</td>
+                <td className="py-2 px-4 border-b">{sesi.mahasiswa_nama}</td>
+                <td className="py-2 px-4 border-b">{sesi.topik_nama}</td>
+                <td className="py-2 px-4 border-b">{sesi.catatan}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </>
+)}
+
         {loading ? (
           <LoadingSpinner />
         ) : (
@@ -739,7 +905,11 @@ export default function AdminPanel() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                    ID
+                      {activeTab === "mahasiswas"
+                        ? "NRP"
+                        : activeTab === "konselors"
+                        ? "NIK"
+                        : "ID"}
                   </th>
                   {activeTab === "users" && (
                     <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
@@ -804,7 +974,7 @@ export default function AdminPanel() {
                   data.users.map((item: User) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.id}
+                        {item.id}  
                       </td>
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
                         {item.username}
@@ -958,7 +1128,7 @@ export default function AdminPanel() {
                     </tr>
                   ))}
                 {activeTab === "sessions" &&
-                  data.sessions.map((item: Sesi) => (
+                    (filteredSessions.length > 0 ? filteredSessions : data.sessions).map((item: Sesi) => (
                     <tr key={item.sesi_id} className="hover:bg-gray-50">
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
                         {item.sesi_id}

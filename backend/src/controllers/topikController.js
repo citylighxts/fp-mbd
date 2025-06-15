@@ -21,17 +21,21 @@ const createTopik = async (req, res) => {
     }
 
     try {
-        let topik_id;
-        let isUnique = false;
-
-        // Pastikan topik_id unik
-        while (!isUnique) {
-            topik_id = generateCharId();
-            const topikExists = await db.query('SELECT 1 FROM Topik WHERE topik_id = $1', [topik_id]);
-            if (topikExists.rows.length === 0) {
-                isUnique = true;
-            }
+        // Cari topik_id terakhir di database
+        const lastIdResult = await db.query(
+            "SELECT topik_id FROM Topik ORDER BY topik_id DESC LIMIT 1"
+        );
+        let newTopikId;
+        if (lastIdResult.rows.length === 0) {
+            newTopikId = "T001"; // Jika belum ada data sama sekali
+        } else {
+            const lastId = lastIdResult.rows[0].topik_id; // contoh: "T105"
+            const lastNumber = parseInt(lastId.substring(1)); // ambil angka 105
+            const nextNumber = lastNumber + 1;
+            // Format dengan leading zero 3 digit
+            newTopikId = `T${nextNumber.toString().padStart(3, '0')}`;
         }
+
         // Dapatkan admin_id dari tabel Admin berdasarkan user_id yang login
         const adminCheck = await db.query('SELECT admin_id FROM Admin WHERE User_user_id = $1', [loggedInUserUserId]);
         if (adminCheck.rows.length === 0) {
@@ -43,7 +47,7 @@ const createTopik = async (req, res) => {
 
         const result = await db.query(
             'INSERT INTO Topik (topik_id, topik_nama, Admin_admin_id) VALUES ($1, $2, $3) RETURNING *',
-            [topik_id, topik_nama, actualAdminId]
+            [newTopikId, topik_nama, actualAdminId]
         );
         res.status(201).json({ message: 'Topik berhasil dibuat', topik: result.rows[0] });
     } catch (err) {

@@ -229,6 +229,81 @@ const deleteSesi = async (req, res) => {
     }
 };
 
+// Menampilkan sesi selesai milik konselor dalam periode tertentu
+const getSesiSelesaiKonselor = async (req, res) => {
+    try {
+        // Dapatkan NIK konselor yang sedang login
+        const konselors = await db.query('SELECT NIK FROM Konselor WHERE User_user_id = $1', [req.user.user_id]);
+        if (konselors.rows.length === 0) {
+            return res.status(403).json({ message: 'Pengguna bukan konselor yang valid' });
+        }
+        const konselor_nik = konselors.rows[0].nik;
+
+        // Ambil parameter periode dari query string
+        const { start, end } = req.query;
+        if (!start || !end) {
+            return res.status(400).json({ message: 'Parameter start dan end (YYYY-MM-DD) wajib diisi' });
+        }
+
+        // Query sesi selesai
+        const result = await db.query(`
+            SELECT
+                s.sesi_id,
+                s.tanggal,
+                s.status,
+                s.catatan,
+                m.nama AS mahasiswa_nama,
+                t.topik_nama
+            FROM Sesi s
+            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
+            JOIN Topik t ON s.Topik_topik_id = t.topik_id
+            WHERE s.Konselor_NIK = $1
+              AND s.status = 'Selesai'
+              AND s.tanggal BETWEEN $2 AND $3
+            ORDER BY s.tanggal DESC
+        `, [konselor_nik, start, end]);
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Kesalahan server');
+    }
+};
+
+// Menampilkan sesi konseling oleh konselor dengan spesialisasi tertentu
+const getSesiBySpesialisasi = async (req, res) => {
+    try {
+        const { spesialisasi } = req.query;
+        if (!spesialisasi) {
+            return res.status(400).json({ message: 'Parameter spesialisasi wajib diisi' });
+        }
+
+        const result = await db.query(`
+            SELECT
+                s.sesi_id,
+                s.tanggal,
+                s.status,
+                s.catatan,
+                k.nama AS konselor_nama,
+                k.spesialisasi,
+                m.nama AS mahasiswa_nama,
+                t.topik_nama
+            FROM Sesi s
+            JOIN Konselor k ON s.Konselor_NIK = k.NIK
+            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
+            JOIN Topik t ON s.Topik_topik_id = t.topik_id
+            WHERE k.spesialisasi = $1
+            ORDER BY s.tanggal DESC
+        `, [spesialisasi]);
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Kesalahan server');
+    }
+};
+
+
 module.exports = {
     createSesi,
     getAllSesi,
@@ -236,4 +311,6 @@ module.exports = {
     getSesiForKonselor,
     updateSesi,
     deleteSesi,
+    getSesiSelesaiKonselor,
+    getSesiBySpesialisasi
 };

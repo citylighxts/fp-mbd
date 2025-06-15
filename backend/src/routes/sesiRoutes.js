@@ -5,7 +5,9 @@ const {
     getSesiForMahasiswa,
     getSesiForKonselor,
     updateSesi,
-    deleteSesi
+    deleteSesi,
+    getSesiSelesaiKonselor,
+    getSesiBySpesialisasi
 } = require('../controllers/sesiController');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const router = express.Router();
@@ -27,5 +29,12 @@ router.put('/:id', protect, authorizeRoles('Konselor', 'Admin'), updateSesi);
 
 // Hanya admin yang dapat menghapus sesi
 router.delete('/:id', protect, authorizeRoles('Admin'), deleteSesi);
+
+// Admin/Konselor: sesi selesai dalam periode tertentu
+router.get('/konselor/selesai', protect, authorizeRoles('Admin', 'Konselor'), getSesiSelesaiKonselor);
+
+// Admin/Konselor: sesi berdasarkan spesialisasi konselor
+router.get('/spesialisasi', protect, authorizeRoles('Admin', 'Konselor'), getSesiBySpesialisasi);
+
 
 module.exports = router;

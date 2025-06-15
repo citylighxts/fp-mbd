@@ -4,7 +4,6 @@ const { v4: uuidv4 } = require('uuid');
 // Mendapatkan semua konselor beserta topiknya
 const getKonselors = async (req, res) => {
     try {
-        // Jika ada query param userId, filter berdasarkan itu
         const { userId } = req.query;
         let query = `
             SELECT
@@ -27,7 +26,6 @@ const getKonselors = async (req, res) => {
         }
 
         query += ` GROUP BY k.NIK, k.nama, k.spesialisasi, k.kontak, u.username ORDER BY k.nama;`;
-
 
         const result = await db.query(query, params);
         res.json(result.rows);
@@ -86,11 +84,11 @@ const updateKonselor = async (req, res) => {
     }
 };
 
-// Menghapus konselor
+// Menghapus konselor -- PERBAIKAN ADA DI SINI!
 const deleteKonselor = async (req, res) => {
-    const { nik } = req.params; // NIK
+    const { nik } = req.params;
     try {
-        // Pertama, dapatkan User_user_id yang terkait dengan NIK ini
+        // Cek apakah konselor ada
         const konselorUserResult = await db.query('SELECT User_user_id FROM Konselor WHERE NIK = $1', [nik]);
         if (konselorUserResult.rows.length === 0) {
             return res.status(404).json({ message: 'Konselor tidak ditemukan' });
@@ -100,21 +98,23 @@ const deleteKonselor = async (req, res) => {
         const client = await db.pool.connect();
         try {
             await client.query('BEGIN');
-            // Hapus entri di tabel Konselor_Topik (akan CASCADE dari Konselor_NIK)
+            // Hapus relasi Konselor_Topik
             await client.query('DELETE FROM Konselor_Topik WHERE Konselor_NIK = $1', [nik]);
-            // Hapus entri di tabel Sesi (ON DELETE RESTRICT)
-            // Cek apakah ada sesi yang terkait
+            // Cek apakah ada sesi terkait (jika ada, batalkan hapus)
             const relatedSessions = await client.query('SELECT 1 FROM Sesi WHERE Konselor_NIK = $1', [nik]);
             if (relatedSessions.rows.length > 0) {
                 throw new Error('Konselor tidak dapat dihapus karena masih terkait dengan sesi.');
             }
-
-            // Hapus entri di tabel Konselor
-            await client.query('DELETE FROM Konselor WHERE NIK = $1', [nik]);
-            // Hapus entri di tabel User
-            await client.query('DELETE FROM "User" WHERE user_id = $1', [userId]);
-
+            // Hapus dari Konselor
+            const delKonselor = await client.query('DELETE FROM Konselor WHERE NIK = $1', [nik]);
+            // Hapus dari User
+            const delUser = await client.query('DELETE FROM "User" WHERE user_id = $1', [userId]);
             await client.query('COMMIT');
+
+            // Pastikan baris benar-benar terhapus
+            if (delKonselor.rowCount === 0) {
+                return res.status(404).json({ message: 'Konselor tidak ditemukan (saat hapus).' });
+            }
             res.json({ message: 'Konselor dan pengguna terkait berhasil dihapus' });
         } catch (transactionError) {
             await client.query('ROLLBACK');
@@ -133,7 +133,6 @@ const deleteKonselor = async (req, res) => {
 const addKonselorTopik = async (req, res) => {
     const { konselorNik, topikId } = req.body;
     try {
-        // Verifikasi keberadaan Konselor dan Topik
         const konselorExists = await db.query('SELECT 1 FROM Konselor WHERE NIK = $1', [konselorNik]);
         const topikExists = await db.query('SELECT 1 FROM Topik WHERE topik_id = $1', [topikId]);
 

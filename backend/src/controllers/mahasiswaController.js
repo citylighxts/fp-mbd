@@ -76,11 +76,13 @@ const updateMahasiswa = async (req, res) => {
 
 // Menghapus mahasiswa
 const deleteMahasiswa = async (req, res) => {
-    const { nrp } = req.params; // NRP
+    const { nrp } = req.params;
+    console.log("Request hapus mahasiswa NRP:", nrp);
     try {
-        // Pertama, dapatkan User_user_id yang terkait dengan NRP ini
         const mhsUserResult = await db.query('SELECT User_user_id FROM Mahasiswa WHERE NRP = $1', [nrp]);
+        console.log("Hasil select user:", mhsUserResult.rows);
         if (mhsUserResult.rows.length === 0) {
+            console.log("Mahasiswa tidak ditemukan");
             return res.status(404).json({ message: 'Mahasiswa tidak ditemukan' });
         }
         const userId = mhsUserResult.rows[0].user_user_id;
@@ -88,11 +90,10 @@ const deleteMahasiswa = async (req, res) => {
         const client = await db.pool.connect();
         try {
             await client.query('BEGIN');
-            // Hapus entri di tabel Mahasiswa
-            await client.query('DELETE FROM Mahasiswa WHERE NRP = $1', [nrp]);
-            // Hapus entri di tabel User
-            await client.query('DELETE FROM "User" WHERE user_id = $1', [userId]);
-
+            const delMhs = await client.query('DELETE FROM Mahasiswa WHERE NRP = $1', [nrp]);
+            console.log("Baris mahasiswa dihapus:", delMhs.rowCount);
+            const delUser = await client.query('DELETE FROM "User" WHERE user_id = $1', [userId]);
+            console.log("Baris user dihapus:", delUser.rowCount);
             await client.query('COMMIT');
             res.json({ message: 'Mahasiswa dan pengguna terkait berhasil dihapus' });
         } catch (transactionError) {
@@ -108,9 +109,44 @@ const deleteMahasiswa = async (req, res) => {
     }
 };
 
+// Tambahkan di atas module.exports
+const ajukanSesiKonseling = async (req, res) => {
+    const { konselor_id, topik_id, tanggal, waktu } = req.body;
+    const mahasiswa_nrp = req.user.nrp; // pastikan middleware auth mengisi req.user.nrp
+
+    try {
+        // Validasi data
+        if (!konselor_id || !topik_id || !tanggal || !waktu) {
+            return res.status(400).json({ message: 'Data tidak lengkap' });
+        }
+
+        // Cek apakah sudah ada sesi aktif dengan konselor dan topik yang sama
+        const cek = await db.query(
+            'SELECT * FROM SesiKonseling WHERE mahasiswa_nrp = $1 AND konselor_id = $2 AND topik_id = $3 AND status IN (\'Menunggu\', \'Disetujui\')',
+            [mahasiswa_nrp, konselor_id, topik_id]
+        );
+        if (cek.rows.length > 0) {
+            return res.status(409).json({ message: 'Anda sudah memiliki sesi aktif untuk topik ini.' });
+        }
+
+        // Insert sesi baru
+        const result = await db.query(
+            'INSERT INTO SesiKonseling (sesi_id, mahasiswa_nrp, konselor_id, topik_id, tanggal, waktu, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [uuidv4(), mahasiswa_nrp, konselor_id, topik_id, tanggal, waktu, 'Menunggu']
+        );
+        res.status(201).json({ message: 'Sesi konseling berhasil diajukan', sesi: result.rows[0] });
+    } catch (err) {
+        console.error('[AJUKAN SESI] Error:', err.message);
+        res.status(500).json({ message: 'Gagal mengajukan sesi konseling' });
+    }
+};
+
+
+
 module.exports = {
     getMahasiswas,
     getMahasiswaByNRP,
     updateMahasiswa,
     deleteMahasiswa,
+    ajukanSesiKonseling
 };
