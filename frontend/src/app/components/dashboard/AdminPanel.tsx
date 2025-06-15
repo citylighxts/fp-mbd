@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
 import { useAuth } from "../../context/AuthContext";
-import api from "../../lib/api";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import MessageDisplay from "../../components/MessageDisplay";
+import api from "../../lib/api"; // Path sudah benar
+import LoadingSpinner from "../../components/LoadingSpinner"; // Path sudah benar
+import MessageDisplay from "../../components/MessageDisplay"; // Path sudah benar
 import {
   FaUser,
   FaUserTie,
@@ -44,6 +44,14 @@ type FormValues = {
   catatan: string; // Untuk sesi
 };
 
+// NEW: Definisikan ulang Sesi untuk hasil rekap sesi selesai
+// Berdasarkan query backend: sesi_id, tanggal, status, nama_mahasiswa, nama_konselor, nama_topik, catatan
+interface CompletedSesi extends Sesi {
+  nama_mahasiswa: string;
+  nama_konselor: string;
+  nama_topik: string;
+}
+
 const statusLabels: { [key: string]: string } = {
   Requested: "Diminta",
   Scheduled: "Dijadwalkan",
@@ -71,13 +79,15 @@ export default function AdminPanel() {
 
   // NEW: States untuk filter mahasiswa berdasarkan topik
   const [mahasiswaTopikFilter, setMahasiswaTopikFilter] = useState<string>("");
-  const [filteredMahasiswa, setFilteredMahasiswa] = useState<Mahasiswa[]>([]);
+  const [filteredMahasiswa, setFilteredMahasiswa] = useState<Mahasiswa[]>([]); // Mahasiswa[] karena hanya data mahasiswa
   const [isMahasiswaFiltering, setIsMahasiswaFiltering] = useState<boolean>(false);
   const [mahasiswaFilterMessage, setMahasiswaFilterMessage] = useState<string>("");
 
 
+  // States untuk filter periode sesi selesai
   const [periode, setPeriode] = useState({ start: "", end: "" });
-  const [sesiSelesai, setSesiSelesai] = useState<Sesi[]>([]);
+  // Menggunakan tipe CompletedSesi untuk menampung hasil rekap
+  const [sesiSelesai, setSesiSelesai] = useState<CompletedSesi[]>([]);
   const [loadingSelesai, setLoadingSelesai] = useState(false);
   const [pesanSelesai, setPesanSelesai] = useState("");
 
@@ -130,9 +140,6 @@ export default function AdminPanel() {
         // Konselor endpoint sudah mengambil topik_nama
         const response = await api.get<Konselor[]>("/konselors");
         setData((prev) => ({ ...prev, konselor: response.data }));
-        // --- LOG UNTUK MEMERIKSA DATA KONSELOR ---
-        console.log("DATA KONSELOR DITERIMA DARI BACKEND:", response.data);
-        // ----------------------------------------------------
       } else if (tab === "topik") {
         const response = await api.get<Topik[]>("/topiks");
         setData((prev) => ({ ...prev, topik: response.data }));
@@ -194,11 +201,14 @@ export default function AdminPanel() {
     if (!mahasiswaTopikFilter) {
       setMahasiswaFilterMessage("Masukkan nama topik untuk memfilter.");
       setMessageType("error");
+      setFilteredMahasiswa([]); // Pastikan dikosongkan
       return;
     }
     setIsMahasiswaFiltering(true);
     setMahasiswaFilterMessage("");
+    setMessageType("info"); // Reset message type
     try {
+      // Menggunakan endpoint baru: /mahasiswas/by-topik
       const response = await api.get<Mahasiswa[]>(
         `/mahasiswas/by-topik?topikNama=${encodeURIComponent(
           mahasiswaTopikFilter
@@ -207,10 +217,11 @@ export default function AdminPanel() {
       setFilteredMahasiswa(response.data);
       if (response.data.length === 0) {
         setMahasiswaFilterMessage(`Tidak ada mahasiswa yang ditemukan untuk topik "${mahasiswaTopikFilter}".`);
+        setMessageType("info"); // Atau 'warning' jika ada
       } else {
-        setMahasiswaFilterMessage(`Menampilkan mahasiswa yang pernah sesi dengan topik "${mahasiswaTopikFilter}".`);
+        setMahasiswaFilterMessage(`Menampilkan ${response.data.length} mahasiswa yang pernah sesi dengan topik "${mahasiswaTopikFilter}".`);
+        setMessageType("success");
       }
-      setMessageType("success");
     } catch (error: any) {
       setFilteredMahasiswa([]);
       setMahasiswaFilterMessage(
@@ -224,24 +235,38 @@ export default function AdminPanel() {
   };
 
 
+  // Fungsi baru untuk memanggil endpoint rekap sesi selesai
   const fetchSesiSelesai = async () => {
     if (!periode.start || !periode.end) {
       setPesanSelesai("Pilih tanggal mulai dan akhir periode.");
+      setMessageType("error"); // Set messageType for error
       return;
     }
     setLoadingSelesai(true);
     setPesanSelesai("");
+    setSesiSelesai([]); // Kosongkan data sebelumnya
+    setMessageType("info"); // Reset message type
     try {
-      const response = await api.get<Sesi[]>(
-        `/sesi/konselor/selesai?start=${periode.start}&end=${periode.end}`
+      // Menggunakan endpoint baru: /api/sesi/completed
+      // Pastikan format tanggal sesuai dengan yang diharapkan backend (YYYY-MM-DD)
+      const response = await api.get<CompletedSesi[]>(
+        `/sesi/completed?start_date=${periode.start}&end_date=${periode.end}`
       );
       setSesiSelesai(response.data);
       if (response.data.length === 0) {
-        setPesanSelesai("Tidak ada sesi selesai pada periode ini.");
+        setPesanSelesai("Tidak ada sesi selesai ditemukan pada periode ini.");
+        setMessageType("info"); // Atau 'warning' jika ada
+      } else {
+        setPesanSelesai(`Ditemukan ${response.data.length} sesi selesai.`);
+        setMessageType("success");
       }
     } catch (err: any) {
-      setPesanSelesai("Gagal memuat data sesi selesai.");
+      console.error("Error fetching completed sessions:", err);
+      setPesanSelesai(
+        err.response?.data?.message || "Gagal memuat data sesi selesai."
+      );
       setSesiSelesai([]);
+      setMessageType("error");
     } finally {
       setLoadingSelesai(false);
     }
@@ -296,7 +321,6 @@ export default function AdminPanel() {
     setFormValues((prev) => ({ ...prev, [name]: value }));
   };
 
-  // new
   const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -727,6 +751,7 @@ export default function AdminPanel() {
         Dashboard Admin
       </h1>
 
+      {/* Menampilkan pesan umum */}
       {message && <MessageDisplay message={message} type={messageType} />}
 
       <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
@@ -810,51 +835,80 @@ export default function AdminPanel() {
           </button>
         )}
 
-        {/* NEW: Filter Mahasiswa berdasarkan Topik */}
+        {/* --- NEW: Filter Mahasiswa berdasarkan Topik --- */}
         {activeTab === "mahasiswa" && (
-            <div className="mb-4 flex flex-col md:flex-row md:items-end gap-2">
-                <div>
-                    <label
-                        htmlFor="mahasiswaTopikFilter"
-                        className="block text-sm font-medium text-gray-700"
-                    >
-                        Filter Mahasiswa Berdasarkan Topik Sesi:
-                    </label>
-                    <input
-                        id="mahasiswaTopikFilter"
-                        type="text"
-                        className="border rounded px-2 py-1 w-60"
-                        placeholder="Masukkan nama topik, misal: Stres Akademik"
-                        value={mahasiswaTopikFilter}
-                        onChange={(e) => setMahasiswaTopikFilter(e.target.value)}
-                    />
-                </div>
-                <button
-                    className="btn-primary mt-2 md:mt-0"
-                    onClick={fetchMahasiswaByTopik}
-                    disabled={isMahasiswaFiltering}
-                >
-                    {isMahasiswaFiltering ? "Memuat..." : "Tampilkan Mahasiswa"}
-                </button>
-                {(filteredMahasiswa.length > 0 || mahasiswaFilterMessage) && (
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+                <h3 className="text-lg font-semibold mb-2">Filter Mahasiswa Berdasarkan Topik Sesi</h3>
+                <div className="flex flex-col md:flex-row md:items-end gap-2">
+                    <div>
+                        <label
+                            htmlFor="mahasiswaTopikFilter"
+                            className="block text-sm font-medium text-gray-700"
+                        >
+                            Nama Topik Sesi:
+                        </label>
+                        <input
+                            id="mahasiswaTopikFilter"
+                            type="text"
+                            className="border rounded px-2 py-1 w-60"
+                            placeholder="Misal: Stres Akademik"
+                            value={mahasiswaTopikFilter}
+                            onChange={(e) => setMahasiswaTopikFilter(e.target.value)}
+                        />
+                    </div>
                     <button
-                        className="btn-secondary ml-2"
-                        onClick={() => {
-                            setFilteredMahasiswa([]);
-                            setMahasiswaTopikFilter("");
-                            setMahasiswaFilterMessage("");
-                            setMessage(""); // Bersihkan pesan umum juga
-                            fetchData("mahasiswa"); // Muat ulang semua data mahasiswa
-                        }}
+                        className="btn-primary mt-2 md:mt-0"
+                        onClick={fetchMahasiswaByTopik}
+                        disabled={isMahasiswaFiltering}
                     >
-                        Reset Filter
+                        {isMahasiswaFiltering ? "Memuat..." : "Tampilkan Mahasiswa"}
                     </button>
+                    {(filteredMahasiswa.length > 0 || mahasiswaFilterMessage) && (
+                        <button
+                            className="btn-secondary ml-2"
+                            onClick={() => {
+                                setFilteredMahasiswa([]);
+                                setMahasiswaTopikFilter("");
+                                setMahasiswaFilterMessage("");
+                                setMessageType("info"); // Bersihkan pesan umum juga
+                                fetchData("mahasiswa"); // Muat ulang semua data mahasiswa
+                            }}
+                        >
+                            Reset Filter
+                        </button>
+                    )}
+                </div>
+                {mahasiswaFilterMessage && (
+                     <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                        {mahasiswaFilterMessage}
+                    </div>
                 )}
-            </div>
-        )}
-        {mahasiswaFilterMessage && (
-             <div className={`mb-4 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                {mahasiswaFilterMessage}
+
+                {!isMahasiswaFiltering && filteredMahasiswa.length > 0 && (
+                    <div className="overflow-x-auto mt-4">
+                        <h4 className="text-md font-semibold mb-2">Hasil Filter Mahasiswa</h4>
+                        <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                            <thead>
+                                <tr className="bg-gray-100">
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">NRP</th>
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama</th>
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Departemen</th>
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Kontak</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredMahasiswa.map((item) => (
+                                    <tr key={item.nrp} className="hover:bg-gray-50">
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.nrp}</td>
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.nama}</td>
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.departemen}</td>
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.kontak}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         )}
         {/* --- END NEW FILTER MAHASISWA --- */}
@@ -862,117 +916,138 @@ export default function AdminPanel() {
 
         {activeTab === "session" && (
           <>
-            {/* --- FILTER SPESIALISASI --- */}
-            <div className="mb-4 flex flex-col md:flex-row md:items-end gap-2">
-              <div>
-                <label
-                  htmlFor="spesialisasiFilter"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Filter Sesi Konseling Berdasarkan Spesialisasi Konselor:
-                </label>
-                <input
-                  id="spesialisasiFilter"
-                  type="text"
-                  className="border rounded px-2 py-1 w-60"
-                  placeholder="Masukkan spesialisasi, misal: Masalah Akademik"
-                  value={spesialisasiFilter}
-                  onChange={(e) => setSpesialisasiFilter(e.target.value)}
-                />
-              </div>
-              <button
-                className="btn-primary mt-2 md:mt-0"
-                onClick={fetchsessionBySpesialisasi}
-                disabled={isFiltering}
-              >
-                {isFiltering ? "Memuat..." : "Tampilkan Sesi"}
-              </button>
-              {filteredsession.length > 0 && (
+            {/* --- FILTER SPESIALISASI KONSELOR --- */}
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold mb-2">Filter Sesi Berdasarkan Spesialisasi Konselor</h3>
+              <div className="flex flex-col md:flex-row md:items-end gap-2">
+                <div>
+                  <label
+                    htmlFor="spesialisasiFilter"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Spesialisasi Konselor:
+                  </label>
+                  <input
+                    id="spesialisasiFilter"
+                    type="text"
+                    className="border rounded px-2 py-1 w-60"
+                    placeholder="Misal: Masalah Akademik"
+                    value={spesialisasiFilter}
+                    onChange={(e) => setSpesialisasiFilter(e.target.value)}
+                  />
+                </div>
                 <button
-                  className="btn-secondary ml-2"
-                  onClick={() => {
-                    setFilteredsession([]);
-                    setSpesialisasiFilter("");
-                    setMessage("");
-                  }}
+                  className="btn-primary mt-2 md:mt-0"
+                  onClick={fetchsessionBySpesialisasi}
+                  disabled={isFiltering}
                 >
-                  Reset Filter
+                  {isFiltering ? "Memuat..." : "Tampilkan Sesi"}
                 </button>
+                {filteredsession.length > 0 && (
+                  <button
+                    className="btn-secondary ml-2"
+                    onClick={() => {
+                      setFilteredsession([]);
+                      setSpesialisasiFilter("");
+                      setMessage("");
+                      fetchData("session"); // Muat ulang semua sesi
+                    }}
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* --- REKAP SESI SELESAI PERIODE --- */}
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold mb-2">Rekap Sesi Selesai per Periode</h3>
+              <div className="flex flex-col md:flex-row gap-2 md:items-end">
+                <div>
+                  <label htmlFor="periodeStart" className="block text-sm font-medium text-gray-700">
+                    Periode Mulai:
+                  </label>
+                  <input
+                    type="date"
+                    id="periodeStart"
+                    value={periode.start}
+                    onChange={(e) =>
+                      setPeriode((p) => ({ ...p, start: e.target.value }))
+                    }
+                    className="border rounded px-2 py-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="periodeEnd" className="block text-sm font-medium text-gray-700">
+                    Periode Akhir:
+                  </label>
+                  <input
+                    type="date"
+                    id="periodeEnd"
+                    value={periode.end}
+                    onChange={(e) =>
+                      setPeriode((p) => ({ ...p, end: e.target.value }))
+                    }
+                    className="border rounded px-2 py-1"
+                  />
+                </div>
+                <button
+                  className="btn-primary mt-2 md:mt-0"
+                  onClick={fetchSesiSelesai}
+                  disabled={loadingSelesai}
+                >
+                  {loadingSelesai ? "Memuat Rekap..." : "Tampilkan Rekap Sesi Selesai"}
+                </button>
+              </div>
+
+              {pesanSelesai && (
+                <MessageDisplay message={pesanSelesai} type={messageType} />
+              )}
+
+              {!loadingSelesai && sesiSelesai.length > 0 && (
+                <div className="overflow-x-auto mt-4">
+                  <h4 className="text-md font-semibold mb-2">Hasil Rekap Sesi Selesai</h4>
+                  <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">ID Sesi</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Tanggal</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Status</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Mahasiswa</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Konselor</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Topik</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Catatan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sesiSelesai.map((sesi) => (
+                        <tr key={sesi.sesi_id} className="hover:bg-gray-50">
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.sesi_id}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {new Date(sesi.tanggal).toLocaleDateString("id-ID", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{statusLabels[sesi.status] || sesi.status}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.nama_mahasiswa}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.nama_konselor}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.nama_topik}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.catatan || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
-
-            {/* --- LANGSUNG TAMBAHKAN KODE FILTER PERIODE DI SINI --- */}
-            <div className="mb-4 flex flex-col md:flex-row gap-2 items-end">
-              <div>
-                <label className="block text-sm font-medium">
-                  Periode Mulai:
-                </label>
-                <input
-                  type="date"
-                  value={periode.start}
-                  onChange={(e) =>
-                    setPeriode((p) => ({ ...p, start: e.target.value }))
-                  }
-                  className="border rounded px-2 py-1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">
-                  Periode Akhir:
-                </label>
-                <input
-                  type="date"
-                  value={periode.end}
-                  onChange={(e) =>
-                    setPeriode((p) => ({ ...p, end: e.target.value }))
-                  }
-                  className="border rounded px-2 py-1"
-                />
-              </div>
-              <button
-                className="btn-primary mt-2 md:mt-0"
-                onClick={fetchSesiSelesai}
-                disabled={loadingSelesai}
-              >
-                {loadingSelesai ? "Memuat..." : "Tampilkan Sesi Selesai"}
-              </button>
-            </div>
-
-            {pesanSelesai && (
-              <div className="mb-2 text-sm text-red-600">{pesanSelesai}</div>
-            )}
-
-            {!loadingSelesai && sesiSelesai.length > 0 && (
-              <div className="overflow-x-auto mb-6">
-                <table className="min-w-full bg-white border border-gray-200 rounded-md">
-                  <thead>
-                    <tr>
-                      <th className="py-2 px-4 border-b">Tanggal</th>
-                      <th className="py-2 px-4 border-b">Mahasiswa</th>
-                      <th className="py-2 px-4 border-b">Topik</th>
-                      <th className="py-2 px-4 border-b">Catatan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sesiSelesai.map((sesi) => (
-                      <tr key={sesi.sesi_id}>
-                        <td className="py-2 px-4 border-b">{sesi.tanggal}</td>
-                        <td className="py-2 px-4 border-b">
-                          {sesi.mahasiswa_nama}
-                        </td>
-                        <td className="py-2 px-4 border-b">
-                          {sesi.topik_nama}
-                        </td>
-                        <td className="py-2 px-4 border-b">{sesi.catatan}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </>
         )}
 
+        {/* --- MAIN DATA TABLE --- */}
         {loading ? (
           <LoadingSpinner />
         ) : (
@@ -980,7 +1055,6 @@ export default function AdminPanel() {
             <table className="min-w-full bg-white border border-gray-200 rounded-md">
               <thead className="bg-gray-50">
                 <tr>
-                  {/* Headers for Users, admin, mahasiswa, konselor, topik */}
                   {activeTab === "users" && (
                     <>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
@@ -1007,7 +1081,7 @@ export default function AdminPanel() {
                       </th>
                     </>
                   )}
-                  {activeTab === "mahasiswa" && (
+                  {activeTab === "mahasiswa" && filteredMahasiswa.length === 0 && (
                     <>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         NRP
@@ -1023,7 +1097,7 @@ export default function AdminPanel() {
                       </th>
                     </>
                   )}
-                  {activeTab === "konselor" && ( // KONSOLER HEADERS
+                  {activeTab === "konselor" && (
                     <>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         NIK
@@ -1034,10 +1108,6 @@ export default function AdminPanel() {
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         Spesialisasi
                       </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Topik
-                      </th>{" "}
-                      {/* NEW topik COLUMN */}
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         Kontak
                       </th>
@@ -1053,10 +1123,10 @@ export default function AdminPanel() {
                       </th>
                     </>
                   )}
-                  {activeTab === "session" && (
+                  {activeTab === "session" && filteredsession.length === 0 && (
                     <>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Sesi ID
+                        ID Sesi
                       </th>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         Tanggal
@@ -1078,248 +1148,248 @@ export default function AdminPanel() {
                       </th>
                     </>
                   )}
-                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                    Aksi
-                  </th>
+                  {activeTab === "session" && filteredsession.length > 0 && (
+                    <>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        ID Sesi
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Tanggal
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Status
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Mahasiswa
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Konselor
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Topik
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Catatan
+                      </th>
+                    </>
+                  )}
+                  {/* Kolom Aksi hanya tampil jika tidak sedang memfilter Mahasiswa */}
+                  {activeTab !== "mahasiswa" || (activeTab === "mahasiswa" && filteredMahasiswa.length === 0) && (
+                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                      Aksi
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {activeTab === "users" &&
-                  data.users.map((item: User) => (
-                    <tr key={item.user_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.user_id}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.username}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.role}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                  data.users.map((item) => (
+                    <tr key={item.user_id}>
+                      <td className="py-2 px-4 border-b">{item.user_id}</td>
+                      <td className="py-2 px-4 border-b">{item.username}</td>
+                      <td className="py-2 px-4 border-b">{item.role}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
                       </td>
                     </tr>
                   ))}
                 {activeTab === "admin" &&
-                  data.admin.map((item: Admin) => (
-                    <tr key={item.admin_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.admin_id}
+                  data.admin.map((item) => (
+                    <tr key={item.admin_id}>
+                      <td className="py-2 px-4 border-b">{item.admin_id}</td>
+                      <td className="py-2 px-4 border-b">{item.nama}</td>
+                      <td className="py-2 px-4 border-b">
+                        {item.username || "N/A"}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.username}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
                       </td>
                     </tr>
                   ))}
-                {activeTab === "mahasiswa" &&
-                  (filteredMahasiswa.length > 0 && mahasiswaTopikFilter // Tampilkan filteredMahasiswa jika ada filter
-                    ? filteredMahasiswa
-                    : data.mahasiswa // Jika tidak ada filter, tampilkan semua data.mahasiswa
-                  ).map((item: Mahasiswa) => (
-                    <tr key={item.nrp} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nrp}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.departemen}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.kontak}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                {activeTab === "mahasiswa" && filteredMahasiswa.length === 0 && (
+                  // Tampilkan semua mahasiswa jika tidak ada filter aktif
+                  data.mahasiswa.map((item) => (
+                    <tr key={item.nrp}>
+                      <td className="py-2 px-4 border-b">{item.nrp}</td>
+                      <td className="py-2 px-4 border-b">{item.nama}</td>
+                      <td className="py-2 px-4 border-b">{item.departemen}</td>
+                      <td className="py-2 px-4 border-b">{item.kontak}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
                       </td>
                     </tr>
-                  ))}
-                {activeTab === "konselor" && // KONSOLER ROWS
-                  data.konselor.map((item: Konselor) => (
-                    <tr key={item.nik} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nik}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
+                  ))
+                )}
+                {activeTab === "konselor" &&
+                  data.konselor.map((item) => (
+                    <tr key={item.nik}>
+                      <td className="py-2 px-4 border-b">{item.nik}</td>
+                      <td className="py-2 px-4 border-b">{item.nama}</td>
+                      <td className="py-2 px-4 border-b">
                         {item.spesialisasi}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {/* Kolom Topik */}
-                        {item.topik_nama &&
-                        item.topik_nama.length > 0 &&
-                        item.topik_nama[0] !== null ? (
-                          <span className="text-sm text-gray-600">
-                            {item.topik_nama.join(", ")}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.kontak}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                      <td className="py-2 px-4 border-b">{item.kontak}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
                       </td>
                     </tr>
                   ))}
                 {activeTab === "topik" &&
-                  data.topik.map((item: Topik) => (
-                    <tr key={item.topik_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.topik_id}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.topik_nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                  data.topik.map((item) => (
+                    <tr key={item.topik_id}>
+                      <td className="py-2 px-4 border-b">{item.topik_id}</td>
+                      <td className="py-2 px-4 border-b">{item.topik_nama}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
                       </td>
                     </tr>
                   ))}
-                {activeTab === "session" &&
-                  (filteredsession.length > 0
-                    ? filteredsession
-                    : data.session
-                  ).map((item: Sesi) => (
-                    <tr key={item.sesi_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.sesi_id}
+                {activeTab === "session" && filteredsession.length === 0 && (
+                  // Tampilkan semua sesi jika tidak ada filter spesialisasi aktif
+                  data.session.map((item) => (
+                    <tr key={item.sesi_id}>
+                      <td className="py-2 px-4 border-b">{item.sesi_id}</td>
+                      <td className="py-2 px-4 border-b">
+                        {new Date(item.tanggal).toLocaleDateString("id-ID", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {new Date(item.tanggal).toLocaleString()}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
+                      <td className="py-2 px-4 border-b">
                         {statusLabels[item.status] || item.status}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.mahasiswa_nama} ({item.mahasiswa_nrp})
+                      <td className="py-2 px-4 border-b">
+                        {item.mahasiswa_nama}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.konselor_nama} ({item.konselor_nik})
+                      <td className="py-2 px-4 border-b">
+                        {item.konselor_nama}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
+                      <td className="py-2 px-4 border-b">
                         {item.topik_nama}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
+                      <td className="py-2 px-4 border-b">
                         {item.catatan || "-"}
                       </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
                       </td>
                     </tr>
-                  ))}
-                {(
-                    (activeTab === "mahasiswa" && (filteredMahasiswa.length === 0 && mahasiswaTopikFilter && !isMahasiswaFiltering)) ||
-                    (activeTab === "mahasiswa" && !mahasiswaTopikFilter && data.mahasiswa.length === 0 && !loading) ||
-                    (activeTab === "session" && (filteredsession.length === 0 && spesialisasiFilter && !isFiltering)) ||
-                    (activeTab === "session" && !spesialisasiFilter && data.session.length === 0 && !loading) ||
-                    (activeTab !== "mahasiswa" && activeTab !== "session" && data[activeTab]?.length === 0 && !loading)
-                ) && (
-                  <tr>
-                    <td
-                      colSpan={
-                        activeTab === "users" ? 4 :
-                        activeTab === "admin" ? 4 :
-                        activeTab === "mahasiswa" ? 5 :
-                        activeTab === "konselor" ? 6 :
-                        activeTab === "topik" ? 3 :
-                        activeTab === "session" ? 8 :
-                        1
-                      }
-                      className="py-4 px-4 text-center text-gray-500"
-                    >
-                      Tidak ada data untuk ditampilkan.
-                    </td>
-                  </tr>
+                  ))
+                )}
+                {activeTab === "session" && filteredsession.length > 0 && (
+                  // Tampilkan sesi yang difilter berdasarkan spesialisasi
+                  filteredsession.map((item) => (
+                    <tr key={item.sesi_id}>
+                      <td className="py-2 px-4 border-b">{item.sesi_id}</td>
+                      <td className="py-2 px-4 border-b">
+                        {new Date(item.tanggal).toLocaleDateString("id-ID", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="py-2 px-4 border-b">
+                        {statusLabels[item.status] || item.status}
+                      </td>
+                      <td className="py-2 px-4 border-b">
+                        {item.mahasiswa_nama}
+                      </td>
+                      <td className="py-2 px-4 border-b">
+                        {item.konselor_nama}
+                      </td>
+                      <td className="py-2 px-4 border-b">
+                        {item.topik_nama}
+                      </td>
+                      <td className="py-2 px-4 border-b">
+                        {item.catatan || "-"}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -1328,28 +1398,25 @@ export default function AdminPanel() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
-            <h3 className="text-2xl font-bold mb-4 text-primary capitalize">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-11/12 md:w-1/2 lg:w-1/3">
+            <h2 className="text-2xl font-bold mb-4">
               {modalType === "add"
                 ? `Tambah ${
+                    activeTab === "users" ? "Pengguna" : "Topik"
+                  }`
+                : modalType === "edit"
+                ? `Edit ${
                     activeTab === "users"
                       ? "Pengguna"
                       : activeTab === "topik"
                       ? "Topik"
-                      : ""
+                      : activeTab === "session"
+                      ? "Sesi"
+                      : "Data"
                   }`
-                : modalType === "edit"
-                ? `Edit ${
-                    (currentItem as User)?.username ||
-                    (currentItem as Admin)?.nama ||
-                    (currentItem as Mahasiswa)?.nama ||
-                    (currentItem as Konselor)?.nama ||
-                    (currentItem as Topik)?.topik_nama ||
-                    (currentItem as Sesi)?.sesi_id
-                  }`
-                : "Konfirmasi Hapus"}
-            </h3>
+                : "Hapus Data"}
+            </h2>
             {renderModalContent()}
           </div>
         </div>

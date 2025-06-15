@@ -6,7 +6,7 @@
         getSesiForKonselor,
         updateSesi,
         deleteSesi,
-        getSesiSelesaiKonselor, // Pastikan ini diimpor
+        getCompletedSessions, // Pastikan ini diimpor
         getSesiBySpesialisasi   // Pastikan ini diimpor
     } = require('../controllers/sesiController'); // Impor dari sesiController
     const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Impor middleware otentikasi dan otorisasi
@@ -32,7 +32,7 @@
 
     // Rute baru: Menampilkan sesi selesai milik konselor dalam periode tertentu
     // Hanya Konselor atau Admin yang bisa mengakses rute ini
-    router.get('/konselor/selesai', protect, authorizeRoles('Konselor', 'Admin'), getSesiSelesaiKonselor);
+   router.get('/completed', protect, authorizeRoles('Admin'), getCompletedSessions);
 
     // Rute baru: Menampilkan sesi konseling oleh konselor dengan spesialisasi tertentu
     // Hanya Admin yang bisa mengakses rute ini (sesuai spesifikasi fungsi yang ada di controller)
