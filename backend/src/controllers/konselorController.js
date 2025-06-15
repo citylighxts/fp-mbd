@@ -13,6 +13,40 @@ const generateCharId = () => {
     return result;
 };
 
+/**
+ * Initializes or refreshes the 'konselor_jumlah_sesi_view' in the database.
+ * This should be called once when the application starts.
+ */
+const initializeKonselorJumlahSesiView = async () => {
+    const createViewQuery = `
+        CREATE OR REPLACE VIEW konselor_jumlah_sesi_view AS
+        SELECT
+            k.NIK AS konselor_nik,
+            k.nama AS konselor_nama,
+            k.spesialisasi AS konselor_spesialisasi,
+            COUNT(s.sesi_id) AS total_sesi_ditangani,
+            COUNT(CASE WHEN s.status = 'Selesai' THEN 1 END) AS total_sesi_selesai,
+            COUNT(CASE WHEN s.status IN ('Requested', 'Scheduled') THEN 1 END) AS total_sesi_aktif_pending
+        FROM
+            Konselor k
+        LEFT JOIN
+            Sesi s ON k.NIK = s.Konselor_NIK
+        GROUP BY
+            k.NIK, k.nama, k.spesialisasi
+        ORDER BY
+            k.nama;
+    `;
+    try {
+        await db.query(createViewQuery);
+        console.log('View "konselor_jumlah_sesi_view" created or replaced successfully.');
+    } catch (error) {
+        console.error('Error creating or replacing "konselor_jumlah_sesi_view":', error.message);
+        console.error('Detailed error:', error);
+        // Depending on your application's robustness, you might want to exit or handle this more gracefully.
+    }
+};
+
+
 // Mendapatkan semua konselor beserta topiknya
 const getKonselors = async (req, res) => {
     const { userId, spesialisasi } = req.query; // Dapatkan parameter spesialisasi juga
@@ -309,5 +343,6 @@ module.exports = {
     getSesiSelesaiKonselor,
     getSesiBySpesialisasi,
     getKonselorTanpaSesi,
-    getKonselorSessionSummary
+    getKonselorSessionSummary,
+    initializeKonselorJumlahSesiView // Export the new function
 };
