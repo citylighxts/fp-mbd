@@ -6,7 +6,8 @@ const {
   deleteKonselor, 
   addKonselorTopik, 
   removeKonselorTopik, 
-  getKonselorTanpaSesi 
+  getKonselorTanpaSesi,
+  getKonselorSessionSummary
 } = require('../controllers/konselorController');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Ensure correct import
 
@@ -40,6 +41,13 @@ router.get(
   getKonselorTanpaSesi
 );
 
+router.get(
+  '/rekap-sesi',
+  protect,
+  authorizeRoles('Admin'),
+  getKonselorSessionSummary
+);
+
 // Routes for a specific counselor by NIK
 router.route('/:nik')
   .get(protect, authorizeRoles('Admin', 'Konselor'), getKonselorByNIK) // Admin or the Konselor themselves can get details
@@ -60,6 +68,5 @@ router.post(
   authorizeRoles('Admin', 'Konselor'), 
   removeKonselorTopik
 ); 
-
 
 module.exports = router;

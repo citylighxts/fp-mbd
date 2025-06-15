@@ -59,6 +59,15 @@ const statusLabels: { [key: string]: string } = {
   Cancelled: "Dibatalkan",
 };
 
+  interface KonselorSessionSummary {
+    konselor_nik: string;
+    konselor_nama: string;
+    konselor_spesialisasi: string;
+    total_sesi_ditangani: number;
+    total_sesi_selesai: number;
+    total_sesi_aktif_pending: number;
+  }
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<keyof AdminDataState>("users"); // Tipe tab aktif
@@ -87,6 +96,10 @@ export default function AdminPanel() {
   const [filteredKonselor, setFilteredKonselor] = useState<Konselor[]>([]);
   const [isKonselorFiltering, setIsKonselorFiltering] = useState<boolean>(false);
   const [konselorFilterMessage, setKonselorFilterMessage] = useState<string>("");
+
+  const [konselorSessionSummary, setKonselorSessionSummary] = useState<KonselorSessionSummary[]>([]);
+  const [loadingKonselorSummary, setLoadingKonselorSummary] = useState<boolean>(false);
+  const [konselorSummaryMessage, setKonselorSummaryMessage] = useState<string>("");
 
   // States untuk filter periode sesi selesai
   const [periode, setPeriode] = useState({ start: "", end: "" });
@@ -266,6 +279,33 @@ export default function AdminPanel() {
       setMessageType("error");
     } finally {
       setIsKonselorFiltering(false);
+    }
+  };
+
+  const fetchKonselorSessionSummary = async () => {
+    setLoadingKonselorSummary(true);
+    setKonselorSummaryMessage("");
+    setMessageType("info"); // Reset message type
+
+    try {
+      const response = await api.get<KonselorSessionSummary[]>("/konselors/rekap-sesi");
+      console.log("Data diterima dari backend (Rekap Konselor):", response.data); // Ini PENTING
+      setKonselorSessionSummary(response.data);
+      if (response.data.length === 0) {
+        setKonselorSummaryMessage("Tidak ada data rekapitulasi sesi konselor ditemukan.");
+      } else {
+        setKonselorSummaryMessage(`Menampilkan rekapitulasi sesi untuk ${response.data.length} konselor.`);
+      }
+      setMessageType("success");
+    } catch (error: any) {
+      console.error("Error fetching konselor session summary:", error);
+      setKonselorSessionSummary([]);
+      setKonselorSummaryMessage(
+        error.response?.data?.message || "Gagal memuat rekapitulasi sesi konselor."
+      );
+      setMessageType("error");
+    } finally {
+      setLoadingKonselorSummary(false);
     }
   };
 
@@ -947,37 +987,110 @@ export default function AdminPanel() {
         )}
         {/* --- END NEW FILTER MAHASISWA --- */}
 
-        {/* NEW: Filter Konselor yang Belum Pernah Menangani Sesi */}
-        {activeTab === "konselor" && (
-            <div className="mb-4 flex flex-col md:flex-row md:items-end gap-2">
-                <button
-                    className="btn-primary mt-2 md:mt-0"
-                    onClick={fetchKonselorTanpaSesi}
-                    disabled={isKonselorFiltering}
-                >
-                    {isKonselorFiltering ? "Memuat..." : "Tampilkan Konselor Tanpa Sesi"}
-                </button>
-                {(filteredKonselor.length > 0 || konselorFilterMessage) && (
-                    <button
-                        className="btn-secondary ml-2"
-                        onClick={() => {
-                            setFilteredKonselor([]);
-                            setKonselorFilterMessage("");
-                            setMessage(""); // Clear general message
-                            fetchData("konselor"); // Reload all konselor data
-                        }}
-                    >
-                        Reset Filter
-                    </button>
-                )}
+            {activeTab === "konselor" && (
+            // Outer container for all counselor-related filters/reports
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+                <h3 className="text-lg font-semibold mb-4">Filter dan Rekap Konselor</h3> {/* Unified heading */}
+
+                {/* --- Filter Konselor Tanpa Sesi --- */}
+                {/* Wrapped for better logical grouping */}
+                <div className="mb-4 pb-4 border-b border-gray-200"> {/* Added border-b for separation */}
+                    <h4 className="text-md font-semibold mb-2">Konselor Tanpa Sesi</h4>
+                    <div className="flex flex-col md:flex-row md:items-end gap-2">
+                        <button
+                            className="btn-primary mt-2 md:mt-0"
+                            onClick={fetchKonselorTanpaSesi}
+                            disabled={isKonselorFiltering}
+                        >
+                            {isKonselorFiltering ? "Memuat..." : "Tampilkan Konselor Tanpa Sesi"}
+                        </button>
+                        {(filteredKonselor.length > 0 || konselorFilterMessage) && (
+                            <button
+                                className="btn-secondary ml-2"
+                                onClick={() => {
+                                    setFilteredKonselor([]);
+                                    setKonselorFilterMessage("");
+                                    setMessage(""); // Clear general message
+                                    fetchData("konselor"); // Reload all konselor data
+                                }}
+                            >
+                                Reset Filter
+                            </button>
+                        )}
+                    </div>
+                    {konselorFilterMessage && (
+                        <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                            {konselorFilterMessage}
+                        </div>
+                    )}
+                </div>
+                {/* --- END Filter Konselor Tanpa Sesi --- */}
+
+                {/* --- Rekapitulasi Jumlah Sesi Konselor --- */}
+                <div className="mt-4">
+                    <h4 className="text-md font-semibold mb-2">Rekapitulasi Jumlah Sesi Konselor</h4>
+                    <div className="flex flex-col md:flex-row md:items-end gap-2">
+                        <button
+                            className="btn-primary mt-2 md:mt-0"
+                            onClick={fetchKonselorSessionSummary}
+                            disabled={loadingKonselorSummary}
+                        >
+                            {loadingKonselorSummary ? "Memuat Rekap..." : "Tampilkan Rekap Sesi Konselor"}
+                        </button>
+                        {(konselorSessionSummary.length > 0 || konselorSummaryMessage) && (
+                            <button
+                                className="btn-secondary ml-2"
+                                onClick={() => {
+                                    setKonselorSessionSummary([]);
+                                    setKonselorSummaryMessage("");
+                                    setMessageType("info");
+                                }}
+                            >
+                                Reset Rekap
+                            </button>
+                        )}
+                    </div>
+                    {konselorSummaryMessage && (
+                        <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                            {konselorSummaryMessage}
+                        </div>
+                    )}
+                    {/* === PASTIKAN KONDISI INI BENAR === */}
+                    {!loadingKonselorSummary && konselorSessionSummary.length > 0 && (
+                        <div className="overflow-x-auto mt-4">
+                            <h5 className="text-md font-semibold mb-2 text-gray-700">Hasil Rekapitulasi</h5>
+                            <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">NIK</th>
+                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama Konselor</th>
+                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Spesialisasi</th>
+                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Total Sesi</th>
+                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Sesi Selesai</th>
+                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Sesi Aktif/Pending</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {konselorSessionSummary.map((item) => (
+                                        <tr key={item.konselor_nik} className="hover:bg-gray-50">
+                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_nik}</td>
+                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_nama}</td>
+                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_spesialisasi}</td>
+                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.total_sesi_ditangani}</td>
+                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.total_sesi_selesai}</td>
+                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.total_sesi_aktif_pending}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {/* === AKHIR KONDISI INI === */}
+                </div>
+                {/* --- END Rekapitulasi Jumlah Sesi Konselor --- */}
+
             </div>
         )}
-        {konselorFilterMessage && (
-             <div className={`mb-4 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                {konselorFilterMessage}
-            </div>
-        )}
-        {/* --- END NEW FILTER KONSELOR --- */}
 
         {activeTab === "session" && (
           <>

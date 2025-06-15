@@ -279,6 +279,15 @@ const getKonselorTanpaSesi = async (req, res) => {
     }
 };
 
+const getKonselorSessionSummary = async (req, res) => {
+    try {
+        const result = await db.query(`SELECT * FROM konselor_jumlah_sesi_view ORDER BY konselor_nama;`);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Error fetching konselor session summary:", err.message);
+        res.status(500).send('Kesalahan server saat mengambil rekapitulasi sesi konselor');
+    }
+};
 
 module.exports = {
     getKonselors,
@@ -289,5 +298,6 @@ module.exports = {
     removeKonselorTopik,
     getSesiSelesaiKonselor,
     getSesiBySpesialisasi,
-    getKonselorTanpaSesi
+    getKonselorTanpaSesi,
+    getKonselorSessionSummary
 };
