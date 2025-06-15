@@ -15,7 +15,6 @@ import {
   FaEdit,
   FaPlus,
   FaCheck,
-  FaTimes,
 } from "react-icons/fa";
 import { User, Admin, Mahasiswa, Konselor, Topik, Sesi } from "../../types"; // Import types
 
@@ -100,7 +99,7 @@ export default function AdminPanel() {
     status: "",
     catatan: "",
   });
-
+  
   const fetchData = async (tab: keyof AdminDataState) => {
     setLoading(true);
     setMessage("");
@@ -116,8 +115,12 @@ export default function AdminPanel() {
         const response = await api.get<Mahasiswa[]>("/mahasiswas");
         setData((prev) => ({ ...prev, mahasiswas: response.data }));
       } else if (tab === "konselors") {
+        // Konselor endpoint sudah mengambil topik_nama
         const response = await api.get<Konselor[]>("/konselors");
         setData((prev) => ({ ...prev, konselors: response.data }));
+        // --- LOG UNTUK MEMERIKSA DATA KONSELOR ---
+        console.log("DATA KONSELOR DITERIMA DARI BACKEND:", response.data);
+        // ----------------------------------------------------
       } else if (tab === "topics") {
         const response = await api.get<Topik[]>("/topiks");
         setData((prev) => ({ ...prev, topics: response.data }));
@@ -195,8 +198,6 @@ export default function AdminPanel() {
     }
   };
 
-
-
   const openModal = (type: "add" | "edit" | "delete", item: any = null) => {
     setModalType(type);
     setCurrentItem(item);
@@ -214,6 +215,7 @@ export default function AdminPanel() {
       status: item?.status || "",
       catatan: item?.catatan || "",
     });
+
     setIsModalOpen(true);
   };
 
@@ -320,10 +322,7 @@ export default function AdminPanel() {
         }
       } else if (modalType === "delete") {
         if (activeTab === "users" && currentItem && "user_id" in currentItem) {
-          const token = localStorage.getItem("token"); // tambahkan ini
-          await api.delete(`/users/${currentItem.user_id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          await api.delete(`/users/${currentItem.user_id}`);
           setMessage("Pengguna berhasil dihapus!");
         } else if (
           activeTab === "admins" &&
@@ -614,7 +613,7 @@ export default function AdminPanel() {
             </div>
           </>
         )}
-        {activeTab === "konselors" && !isUserTab && (
+        {activeTab === "konselors" && !isUserTab && ( // Ini adalah bagian edit/add konselor di modal
           <>
             <div>
               <label htmlFor="nama">Nama:</label>
@@ -897,321 +896,314 @@ export default function AdminPanel() {
   </>
 )}
 
-        {loading ? (
-          <LoadingSpinner />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200 rounded-md">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      {activeTab === "mahasiswas"
-                        ? "NRP"
-                        : activeTab === "konselors"
-                        ? "NIK"
-                        : "ID"}
-                  </th>
-                  {activeTab === "users" && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Username
-                    </th>
-                  )}
-                  {activeTab !== "sessions" && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Nama
-                    </th>
-                  )}
-                  {(activeTab === "users" || activeTab === "konselors") && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Role/Spesialisasi
-                    </th>
-                  )}
-                  {activeTab === "admins" && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Username
-                    </th>
-                  )}
-                  {activeTab === "mahasiswas" && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Departemen
-                    </th>
-                  )}
-                  {(activeTab === "mahasiswas" ||
-                    activeTab === "konselors") && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Kontak
-                    </th>
-                  )}
-                  {activeTab === "sessions" && (
-                    <>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Tanggal
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Status
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Mahasiswa
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Konselor
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Topik
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Catatan
-                      </th>
-                    </>
-                  )}
-                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                    Aksi
-                  </th>
+    {loading ? (
+      <LoadingSpinner />
+    ) : (
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border border-gray-200 rounded-md">
+          <thead className="bg-gray-50">
+            <tr>
+              {/* Headers for Users, Admins, Mahasiswas, Konselors, Topics */}
+              {activeTab === "users" && (
+                <>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">ID</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Username</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Role</th>
+                </>
+              )}
+              {activeTab === "admins" && (
+                <>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">ID Admin</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Username</th>
+                </>
+              )}
+              {activeTab === "mahasiswas" && (
+                <>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">NRP</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Departemen</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Kontak</th>
+                </>
+              )}
+              {activeTab === "konselors" && ( // KONSOLER HEADERS
+                <>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">NIK</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Spesialisasi</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Topik</th> {/* NEW TOPIC COLUMN */}
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Kontak</th>
+                </>
+              )}
+              {activeTab === "topics" && (
+                <>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">ID Topik</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama Topik</th>
+                </>
+              )}
+              {activeTab === "sessions" && (
+                <>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Sesi ID</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Tanggal</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Status</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Mahasiswa</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Konselor</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Topik</th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Catatan</th>
+                </>
+              )}
+              <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeTab === "users" &&
+              data.users.map((item: User) => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.id}  
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.username}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.role}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openModal("edit", item)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", item)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {activeTab === "users" &&
-                  data.users.map((item: User) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.id}  
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.username}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        -
-                      </td>{" "}
-                      {/* Nama tidak langsung di tabel user */}
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.role}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {activeTab === "admins" &&
-                  data.admins.map((item: Admin) => (
-                    <tr key={item.admin_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.admin_id}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.username}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {activeTab === "mahasiswas" &&
-                  data.mahasiswas.map((item: Mahasiswa) => (
-                    <tr key={item.NRP} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.NRP}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.departemen}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.kontak}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {activeTab === "konselors" &&
-                  data.konselors.map((item: Konselor) => (
-                    <tr key={item.NIK} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.NIK}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.spesialisasi}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.kontak}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {activeTab === "topics" &&
-                  data.topics.map((item: Topik) => (
-                    <tr key={item.topik_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.topik_id}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.topik_nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {activeTab === "sessions" &&
-                    (filteredSessions.length > 0 ? filteredSessions : data.sessions).map((item: Sesi) => (
-                    <tr key={item.sesi_id} className="hover:bg-gray-50">
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.sesi_id}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {new Date(item.tanggal).toLocaleString()}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {statusLabels[item.status] || item.status}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.mahasiswa_nama} ({item.mahasiswa_nrp})
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.konselor_nama} ({item.konselor_nik})
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.topik_nama}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.catatan || "-"}
-                      </td>
-                      <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {data[activeTab]?.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={Object.keys(data[activeTab][0] || {}).length + 2}
-                      className="py-4 px-4 text-center text-gray-500"
-                    >
-                      Tidak ada data untuk ditampilkan.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            {activeTab === "admins" &&
+              data.admins.map((item: Admin) => (
+                <tr key={item.admin_id} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.admin_id}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.nama}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.username}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openModal("edit", item)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", item)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            {activeTab === "mahasiswas" &&
+              data.mahasiswas.map((item: Mahasiswa) => (
+                <tr key={item.NRP} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.NRP}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.nama}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.departemen}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.kontak}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openModal("edit", item)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", item)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            {activeTab === "konselors" && // KONSOLER ROWS
+              data.konselors.map((item: Konselor) => (
+                <tr key={item.nik} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.nik}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.nama}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.spesialisasi}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {/* Kolom Topik */}
+                    {item.topik_nama && item.topik_nama.length > 0 && item.topik_nama[0] !== null ? (
+                      <span className="text-sm text-gray-600">
+                        {item.topik_nama.join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-500">-</span>
+                    )}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.kontak}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openModal("edit", item)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", item)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            {activeTab === "topics" &&
+              data.topics.map((item: Topik) => (
+                <tr key={item.topik_id} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.topik_id}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.topik_nama}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openModal("edit", item)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", item)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            {activeTab === "sessions" &&
+                (filteredSessions.length > 0 ? filteredSessions : data.sessions).map((item: Sesi) => (
+                <tr key={item.sesi_id} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.sesi_id}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {new Date(item.tanggal).toLocaleString()}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {statusLabels[item.status] || item.status}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.mahasiswa_nama} ({item.mahasiswa_nrp})
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.konselor_nama} ({item.konselor_nik})
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.topik_nama}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    {item.catatan || "-"}
+                  </td>
+                  <td className="py-2 px-4 border-b text-sm text-gray-700">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openModal("edit", item)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", item)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            {data[activeTab]?.length === 0 && (
+              <tr>
+                <td
+                  colSpan={Object.keys(data[activeTab][0] || {}).length + 2}
+                  className="py-4 px-4 text-center text-gray-500"
+                >
+                  Tidak ada data untuk ditampilkan.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+    )}
+  </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
-            <h3 className="text-2xl font-bold mb-4 text-primary capitalize">
-              {modalType === "add"
-                ? `Tambah ${
-                    activeTab === "users"
-                      ? "Pengguna"
-                      : activeTab === "topics"
-                      ? "Topik"
-                      : ""
-                  }`
-                : modalType === "edit"
-                ? `Edit ${
-                    (currentItem as User)?.username ||
-                    (currentItem as Admin)?.nama ||
-                    (currentItem as Mahasiswa)?.nama ||
-                    (currentItem as Konselor)?.nama ||
-                    (currentItem as Topik)?.topik_nama ||
-                    (currentItem as Sesi)?.sesi_id
-                  }`
-                : "Konfirmasi Hapus"}
-            </h3>
-            {renderModalContent()}
-          </div>
-        </div>
-      )}
+  {isModalOpen && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
+        <h3 className="text-2xl font-bold mb-4 text-primary capitalize">
+          {modalType === "add"
+            ? `Tambah ${
+                activeTab === "users"
+                  ? "Pengguna"
+                  : activeTab === "topics"
+                  ? "Topik"
+                  : ""
+              }`
+            : modalType === "edit"
+            ? `Edit ${
+                (currentItem as User)?.username ||
+                (currentItem as Admin)?.nama ||
+                (currentItem as Mahasiswa)?.nama ||
+                (currentItem as Konselor)?.nama ||
+                (currentItem as Topik)?.topik_nama ||
+                (currentItem as Sesi)?.sesi_id
+              }`
+            : "Konfirmasi Hapus"}
+        </h3>
+        {renderModalContent()}
+      </div>
     </div>
+  )}
+</div>
   );
 }

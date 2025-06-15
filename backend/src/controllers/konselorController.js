@@ -1,20 +1,57 @@
+// backend/src/controllers/konselorController.js
 const db = require('../config/db');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid'); // Masih digunakan untuk User ID di authController, dll.
+
+// Fungsi utilitas untuk menghasilkan ID CHAR(4) acak (digunakan untuk User/Admin ID)
+// Ini tidak digunakan untuk sesi_id
+const generateCharId = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+};
 
 // Mendapatkan semua konselor beserta topiknya
 const getKonselors = async (req, res) => {
     try {
-        // Menggunakan query paling sederhana untuk menjamin data NIK benar.
-        const result = await db.query('SELECT NIK, nama, spesialisasi, kontak FROM konselor ORDER BY nama ASC');
+        // Jika ada query param userId, filter berdasarkan itu
+        const { userId } = req.query;
+        let query = `
+            SELECT
+                k.NIK,
+                k.nama,
+                k.spesialisasi,
+                k.kontak,
+                u.username,
+                ARRAY_AGG(t.topik_nama) FILTER (WHERE t.topik_nama IS NOT NULL) AS topik_nama
+            FROM Konselor k
+            JOIN "User" u ON k.User_user_id = u.user_id
+            LEFT JOIN Konselor_Topik kt ON k.NIK = kt.Konselor_NIK
+            LEFT JOIN Topik t ON kt.Topik_topik_id = t.topik_id
+        `;
+        const params = [];
 
-        // Mengirim data yang sudah pasti benar ke frontend.
-    res.json(result.rows);
+        if (userId) {
+            query += ` WHERE u.user_id = $1`;
+            params.push(userId);
+        }
+
+        query += ` GROUP BY k.NIK, k.nama, k.spesialisasi, k.kontak, u.username ORDER BY k.nama;`;
+
+        console.log("Executing getKonselors query:", query, "with params:", params); // Tambahkan log ini
+        const result = await db.query(query, params);
+        console.log("Konselors data fetched:", result.rows); // Tambahkan log ini
+        res.json(result.rows);
 
     } catch (err) {
-        console.error("Error di getKonselors:", err.message);
-        res.status(500).send('Kesalahan server');
-}
+        console.error("Error in getKonselors:", err.message);
+        console.error("Detailed error in getKonselors:", err); // Log error lengkap
+        res.status(500).send('Kesalahan server saat mengambil data konselor');
+    }
 };
+
 // Mendapatkan konselor berdasarkan NIK beserta topiknya
 const getKonselorByNIK = async (req, res) => {
     const { nik } = req.params;
@@ -64,11 +101,10 @@ const updateKonselor = async (req, res) => {
     }
 };
 
-// Menghapus konselor -- PERBAIKAN ADA DI SINI!
+// Menghapus konselor
 const deleteKonselor = async (req, res) => {
     const { nik } = req.params;
     try {
-        // Cek apakah konselor ada
         const konselorUserResult = await db.query('SELECT User_user_id FROM Konselor WHERE NIK = $1', [nik]);
         if (konselorUserResult.rows.length === 0) {
             return res.status(404).json({ message: 'Konselor tidak ditemukan' });
@@ -78,20 +114,15 @@ const deleteKonselor = async (req, res) => {
         const client = await db.pool.connect();
         try {
             await client.query('BEGIN');
-            // Hapus relasi Konselor_Topik
             await client.query('DELETE FROM Konselor_Topik WHERE Konselor_NIK = $1', [nik]);
-            // Cek apakah ada sesi terkait (jika ada, batalkan hapus)
             const relatedSessions = await client.query('SELECT 1 FROM Sesi WHERE Konselor_NIK = $1', [nik]);
             if (relatedSessions.rows.length > 0) {
                 throw new Error('Konselor tidak dapat dihapus karena masih terkait dengan sesi.');
             }
-            // Hapus dari Konselor
             const delKonselor = await client.query('DELETE FROM Konselor WHERE NIK = $1', [nik]);
-            // Hapus dari User
             const delUser = await client.query('DELETE FROM "User" WHERE user_id = $1', [userId]);
             await client.query('COMMIT');
 
-            // Pastikan baris benar-benar terhapus
             if (delKonselor.rowCount === 0) {
                 return res.status(404).json({ message: 'Konselor tidak ditemukan (saat hapus).' });
             }
@@ -153,6 +184,81 @@ const removeKonselorTopik = async (req, res) => {
     }
 };
 
+// Menampilkan sesi selesai milik konselor dalam periode tertentu
+const getSesiSelesaiKonselor = async (req, res) => {
+    try {
+        // Dapatkan NIK konselor yang sedang login
+        const konselors = await db.query('SELECT NIK FROM Konselor WHERE User_user_id = $1', [req.user.user_id]);
+        if (konselors.rows.length === 0) {
+            return res.status(403).json({ message: 'Pengguna bukan konselor yang valid' });
+        }
+        const konselor_nik = konselors.rows[0].nik;
+
+        // Ambil parameter periode dari query string
+        const { start, end } = req.query;
+        if (!start || !end) {
+            return res.status(400).json({ message: 'Parameter start dan end (YYYY-MM-DD) wajib diisi' });
+        }
+
+        // Query sesi selesai
+        const result = await db.query(`
+            SELECT
+                s.sesi_id,
+                s.tanggal,
+                s.status,
+                s.catatan,
+                m.nama AS mahasiswa_nama,
+                t.topik_nama
+            FROM Sesi s
+            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
+            JOIN Topik t ON s.Topik_topik_id = t.topik_id
+            WHERE s.Konselor_NIK = $1
+              AND s.status = 'Selesai'
+              AND s.tanggal BETWEEN $2 AND $3
+            ORDER BY s.tanggal DESC
+        `, [konselor_nik, start, end]);
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Kesalahan server');
+    }
+};
+
+// Menampilkan sesi konseling oleh konselor dengan spesialisasi tertentu
+const getSesiBySpesialisasi = async (req, res) => {
+    try {
+        const { spesialisasi } = req.query;
+        if (!spesialisasi) {
+            return res.status(400).json({ message: 'Parameter spesialisasi wajib diisi' });
+        }
+
+        const result = await db.query(`
+            SELECT
+                s.sesi_id,
+                s.tanggal,
+                s.status,
+                s.catatan,
+                k.nama AS konselor_nama,
+                k.spesialisasi,
+                m.nama AS mahasiswa_nama,
+                t.topik_nama
+            FROM Sesi s
+            JOIN Konselor k ON s.Konselor_NIK = k.NIK
+            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
+            JOIN Topik t ON s.Topik_topik_id = t.topik_id
+            WHERE k.spesialisasi = $1
+            ORDER BY s.tanggal DESC
+        `, [spesialisasi]);
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Kesalahan server');
+    }
+};
+
+
 module.exports = {
     getKonselors,
     getKonselorByNIK,
@@ -160,4 +266,6 @@ module.exports = {
     deleteKonselor,
     addKonselorTopik,
     removeKonselorTopik,
+    getSesiSelesaiKonselor,
+    getSesiBySpesialisasi
 };
