@@ -45,6 +45,13 @@ type FormValues = {
   catatan: string; // Untuk sesi
 };
 
+const statusLabels: { [key: string]: string } = {
+  Requested: "Diminta",
+  Scheduled: "Dijadwalkan",
+  Completed: "Selesai",
+  Cancelled: "Dibatalkan",
+};
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<keyof AdminDataState>("users"); // Tipe tab aktif
@@ -602,7 +609,7 @@ export default function AdminPanel() {
               >
                 <option value="">Pilih Status</option>
                 <option value="Requested">Diminta</option>
-                <option value="Scheduled">Terjadwal</option>
+                <option value="Scheduled">Dijadwalkan</option>
                 <option value="Completed">Selesai</option>
                 <option value="Cancelled">Dibatalkan</option>
               </select>
@@ -747,6 +754,11 @@ export default function AdminPanel() {
                   {(activeTab === "users" || activeTab === "konselors") && (
                     <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                       Role/Spesialisasi
+                    </th>
+                  )}
+                  {activeTab === "admins" && (
+                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                      Username
                     </th>
                   )}
                   {activeTab === "mahasiswas" && (
@@ -955,7 +967,7 @@ export default function AdminPanel() {
                         {new Date(item.tanggal).toLocaleString()}
                       </td>
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.status}
+                        {statusLabels[item.status] || item.status}
                       </td>
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
                         {item.mahasiswa_nama} ({item.mahasiswa_nrp})
