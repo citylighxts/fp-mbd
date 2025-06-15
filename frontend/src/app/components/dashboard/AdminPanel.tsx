@@ -1289,6 +1289,9 @@ export default function AdminPanel() {
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         Kontak
                       </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Aksi
+                      </th>
                     </>
                   )}
                   {activeTab === "topik" && (
@@ -1298,6 +1301,9 @@ export default function AdminPanel() {
                       </th>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         Nama Topik
+                      </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Aksi
                       </th>
                     </>
                   )}

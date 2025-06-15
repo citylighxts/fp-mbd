@@ -101,7 +101,6 @@ const updateTopik = async (req, res) => {
     }
 };
 
-// Menghapus topik
 const deleteTopik = async (req, res) => {
     const { id } = req.params;
     try {
@@ -111,12 +110,10 @@ const deleteTopik = async (req, res) => {
         }
         res.json({ message: 'Topik berhasil dihapus' });
     } catch (err) {
-        console.error(err.message);
-        // Tangani error jika topik masih digunakan di Sesi (ON DELETE RESTRICT)
-        if (err.code === '23503') { // PostgreSQL foreign key violation error code
-            return res.status(400).json({ message: 'Topik tidak dapat dihapus karena masih terkait dengan sesi atau konselor' });
+        if (err.message && err.message.includes('Tidak dapat menghapus topik')) {
+            return res.status(400).json({ message: err.message });
         }
-        res.status(500).send('Kesalahan server');
+        res.status(500).send('Kesalahan server saat menghapus topik');
     }
 };
 
