@@ -180,27 +180,6 @@ export default function MahasiswaPanel() {
             ) : (
               <p className="text-gray-500">Tidak ada konselor yang tersedia.</p>
             )}
-            <h3 className="text-xl font-semibold text-gray-700 mt-6 mb-3">
-              Topik Konseling (berdasarkan Konselor Terpilih di Modal)
-            </h3>
-            {filteredTopics.length > 0 ? ( // Menampilkan filteredTopics di sini
-              <ul className="space-y-2">
-                {filteredTopics.map((topik) => (
-                  <li
-                    key={topik.topik_id}
-                    className="bg-gray-50 p-3 rounded-md shadow-sm"
-                  >
-                    <p className="font-semibold text-gray-900">
-                      {topik.topik_nama}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500">
-                Pilih konselor di modal untuk melihat topik yang tersedia, atau konselor terpilih tidak memiliki topik.
-              </p>
-            )}
           </div>
         </div>
 
