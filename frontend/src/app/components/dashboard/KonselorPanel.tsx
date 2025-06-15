@@ -25,6 +25,13 @@ type TopikFormValues = {
   topikId: string;
 };
 
+const statusLabels: { [key: string]: string } = {
+  Requested: "Diminta",
+  Scheduled: "Dijadwalkan", // Sesuai permintaan Anda
+  Completed: "Selesai",
+  Cancelled: "Dibatalkan",
+};
+
 export default function KonselorPanel() {
   const { user } = useAuth();
   const [sesi, setSesi] = useState<Sesi[]>([]);
@@ -221,7 +228,7 @@ export default function KonselorPanel() {
             >
               <option value="">Pilih Status</option>
               <option value="Requested">Diminta</option>
-              <option value="Scheduled">Terjadwal</option>
+              <option value="Scheduled">Dijadwalkan</option>
               <option value="Completed">Selesai</option>
               <option value="Cancelled">Dibatalkan</option>
             </select>
@@ -362,7 +369,7 @@ export default function KonselorPanel() {
                         : "text-red-600"
                     }`}
                   >
-                    Status: {s.status}
+                    Status: {statusLabels[s.status] || s.status}
                   </p>
                   {s.catatan && (
                     <p className="text-sm text-gray-600 mt-2 italic">
