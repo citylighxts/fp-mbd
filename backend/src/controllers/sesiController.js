@@ -150,30 +150,22 @@ const createSesi = async (req, res) => {
 
 // Mendapatkan semua sesi (untuk admin)
 const getAllSesi = async (req, res) => {
+    const { status } = req.query;
     try {
-        const result = await db.query(`
-            SELECT
-                s.sesi_id,
-                s.tanggal,
-                s.status,
-                s.catatan,
-                m.nama AS mahasiswa_nama,
-                m.NRP AS mahasiswa_nrp,
-                k.nama AS konselor_nama,
-                k.NIK AS konselor_nik,
-                t.topik_nama,
-                a.nama AS admin_nama
-            FROM Sesi s
-            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
-            JOIN Konselor k ON s.Konselor_NIK = k.NIK
-            JOIN Topik t ON s.Topik_topik_id = t.topik_id
-            JOIN Admin a ON s.Admin_admin_id = a.admin_id
-            ORDER BY s.tanggal DESC;
-        `);
+        let query = `SELECT * FROM sesi_lengkap_view`; // <-- Gunakan VIEW di sini!
+        const params = [];
+
+        if (status) {
+            query += ` WHERE status = $1`; // `status` adalah kolom di view
+            params.push(status);
+        }
+
+        query += ` ORDER BY tanggal DESC;`;
+        const result = await db.query(query, params);
         res.json(result.rows);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
+        console.error("Error in getAllSesi using view:", err.message);
+        res.status(500).send('Kesalahan server saat mengambil semua sesi');
     }
 };
 
