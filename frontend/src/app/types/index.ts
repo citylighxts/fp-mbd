@@ -1,5 +1,5 @@
 export interface User {
-  id: string;
+  user_id: string;
   username: string;
   role: 'Admin' | 'Mahasiswa' | 'Konselor';
 }
@@ -12,7 +12,7 @@ export interface Admin {
 }
 
 export interface Mahasiswa {
-  NRP: string;
+  nrp: string;
   nama: string;
   departemen: string;
   kontak: string;

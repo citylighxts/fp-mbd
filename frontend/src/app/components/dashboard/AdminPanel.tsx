@@ -1027,9 +1027,9 @@ export default function AdminPanel() {
               <tbody>
                 {activeTab === "users" &&
                   data.users.map((item: User) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item.user_id} className="hover:bg-gray-50">
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.id}
+                        {item.user_id}
                       </td>
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
                         {item.username}
@@ -1087,9 +1087,9 @@ export default function AdminPanel() {
                   ))}
                 {activeTab === "mahasiswa" &&
                   data.mahasiswa.map((item: Mahasiswa) => (
-                    <tr key={item.NRP} className="hover:bg-gray-50">
+                    <tr key={item.nrp} className="hover:bg-gray-50">
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
-                        {item.NRP}
+                        {item.nrp}
                       </td>
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
                         {item.nama}
