@@ -1,6 +1,9 @@
+// backend/src/controllers/sesiController.js
 const db = require('../config/db');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid'); // Masih digunakan untuk User/Admin ID di authController
 
+// Fungsi utilitas untuk menghasilkan ID CHAR(4) acak (digunakan untuk User/Admin ID di authController)
+// Ini tidak digunakan untuk sesi_id
 const generateCharId = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -10,6 +13,32 @@ const generateCharId = () => {
     return result;
 };
 
+// Fungsi untuk mendapatkan nomor sesi terakhir dari database
+const getLatestSesiNumber = async () => {
+    try {
+        console.log('Fetching latest sesi_id from DB...');
+        const result = await db.query(
+            `SELECT sesi_id FROM Sesi
+             WHERE sesi_id LIKE 'S%' AND LENGTH(sesi_id) = 4 AND SUBSTRING(sesi_id, 2, 3) ~ '^[0-9]+$'
+             ORDER BY CAST(SUBSTRING(sesi_id, 2, 3) AS INTEGER) DESC
+             LIMIT 1;`
+        );
+        if (result.rows.length > 0) {
+            const lastId = result.rows[0].sesi_id; // Contoh: 'S005'
+            const lastNumber = parseInt(lastId.substring(1), 10); // Ekstrak 5
+            console.log('Latest sesi_id found:', lastId, 'Parsed number:', lastNumber);
+            return lastNumber;
+        }
+    } catch (error) {
+        console.error("Error getting latest sesi number from DB (will default to 0):", error.message);
+        console.error("Detailed DB error:", error); // Log the full error
+        // Jika ada error atau belum ada sesi dengan format 'S###', mulai dari 0
+        return 0;
+    }
+    console.log('No existing sesi_id with "S###" format found. Starting from 0.');
+    return 0; // Jika tidak ada sesi yang cocok dengan pola 'S###'
+};
+
 // Membuat sesi baru (oleh mahasiswa)
 const createSesi = async (req, res) => {
     const { konselor_nik, topik_id } = req.body;
@@ -17,58 +46,110 @@ const createSesi = async (req, res) => {
     const status = 'Requested'; // Status awal
     const catatan = null; // Awalnya catatan kosong
 
-    // Dapatkan Mahasiswa_NRP dari pengguna yang login (req.user.user_id)
-    const mahasiswas = await db.query('SELECT NRP FROM Mahasiswa WHERE User_user_id = $1', [req.user.user_id]);
-    if (mahasiswas.rows.length === 0) {
-        return res.status(403).json({ message: 'Pengguna bukan mahasiswa yang valid' });
-    }
-    const mahasiswa_nrp = mahasiswas.rows[0].nrp;
+    console.log('--- Create Sesi Request Received ---');
+    console.log('Request data:', { konselor_nik, topik_id });
 
-    // Admin_admin_id: Asumsi ada admin default atau ambil dari request jika admin yang membuat sesi
-    // Untuk demo ini, kita akan ambil admin pertama yang ditemukan atau buat dummy
+    // Validasi pengguna yang login
+    if (!req.user || !req.user.user_id || req.user.role !== 'Mahasiswa') {
+        console.error('Error: User not authenticated or not a Mahasiswa.');
+        return res.status(403).json({ message: 'Akses ditolak: Hanya Mahasiswa yang dapat membuat sesi.' });
+    }
+
+    let mahasiswa_nrp;
+    try {
+        const mahasiswas = await db.query('SELECT NRP FROM Mahasiswa WHERE User_user_id = $1', [req.user.user_id]);
+        if (mahasiswas.rows.length === 0) {
+            console.error('Error: No Mahasiswa entry found for user_id:', req.user.user_id);
+            return res.status(403).json({ message: 'Pengguna bukan mahasiswa yang valid' });
+        }
+        mahasiswa_nrp = mahasiswas.rows[0].nrp;
+        console.log('Mahasiswa NRP found:', mahasiswa_nrp);
+    } catch (e) {
+        console.error("Error fetching Mahasiswa NRP:", e.message);
+        console.error("Detailed Mahasiswa fetch error:", e);
+        return res.status(500).json({ message: 'Gagal mendapatkan data mahasiswa.' });
+    }
+
+    // Mendapatkan Admin_admin_id (ambil admin pertama yang ditemukan)
     let admin_id;
     try {
         const adminResult = await db.query('SELECT admin_id FROM Admin LIMIT 1');
         if (adminResult.rows.length > 0) {
             admin_id = adminResult.rows[0].admin_id;
+            console.log('Admin ID found for session creation:', admin_id);
         } else {
-            // Ini akan membuat error jika tidak ada admin dan tidak ada cara untuk membuat admin
             console.error('Tidak ada admin ditemukan di database. Pastikan ada setidaknya satu admin terdaftar.');
             return res.status(500).json({ message: 'Tidak dapat membuat sesi: Admin tidak ditemukan.' });
         }
     } catch (e) {
-        console.error("Gagal mendapatkan admin_id", e);
+        console.error("Gagal mendapatkan admin_id untuk sesi:", e.message);
+        console.error("Detailed Admin ID fetch error:", e);
         return res.status(500).json({ message: 'Gagal mendapatkan admin_id untuk sesi' });
     }
 
-
-    if (!mahasiswa_nrp || !konselor_nik || !topik_id) {
-        return res.status(400).json({ message: 'Mahasiswa, Konselor, dan Topik wajib' });
+    // Validasi input wajib dari request body
+    if (!konselor_nik || !topik_id) {
+        console.error('Error: Missing Konselor NIK, or Topik ID in request body.');
+        return res.status(400).json({ message: 'Konselor dan Topik wajib untuk membuat sesi.' });
     }
 
-    try {
-        let sesi_id;
-        let isUnique = false;
+    let sesi_id;
+    let maxRetries = 5; // Maksimal percobaan untuk ID unik jika ada konflik
+    let currentRetry = 0;
 
-        while (!isUnique) {
-            sesi_id = generateCharId();
-            const sesiExists = await db.query('SELECT 1 FROM Sesi WHERE sesi_id = $1', [sesi_id]);
-            if (sesiExists.rows.length === 0) {
-                isUnique = true;
+    // Loop untuk mencoba membuat sesi dengan ID unik (handle concurrency)
+    while (currentRetry < maxRetries) {
+        try {
+            // Dapatkan nomor sesi terakhir dan increment
+            // Pastikan getLatestSesiNumber didefinisikan sebelum createSesi
+            const latestNumber = await getLatestSesiNumber(); 
+            const newNumber = latestNumber + 1;
+            sesi_id = `S${String(newNumber).padStart(3, '0')}`; // Format ke S001, S002, dst.
+
+            console.log(`Attempting to create sesi with generated sesi_id: ${sesi_id} (Attempt ${currentRetry + 1}/${maxRetries})`);
+
+            // Masukkan sesi ke database
+            const result = await db.query(
+                `INSERT INTO Sesi (sesi_id, tanggal, status, catatan, Mahasiswa_NRP, Konselor_NIK, Admin_admin_id, Topik_topik_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+                [sesi_id, tanggal, status, catatan, mahasiswa_nrp, konselor_nik, admin_id, topik_id]
+            );
+            console.log('Sesi created successfully:', result.rows[0]);
+            return res.status(201).json({ message: 'Sesi konseling berhasil diminta', sesi: result.rows[0] });
+
+        } catch (err) {
+            console.error(`Error creating sesi with sesi_id ${sesi_id}:`, err.message);
+            console.error('Detailed Sesi creation error:', err);
+
+            // Tangani error jika ID duplikat (kemungkinan karena concurrency)
+            if (err.code === '23505' && err.constraint === 'sesi_pkey') { // 'sesi_pkey' adalah nama default primary key constraint
+                console.warn(`Duplicate sesi_id ${sesi_id} detected. Retrying...`);
+                currentRetry++;
+                await new Promise(resolve => setTimeout(resolve, 50 + currentRetry * 20)); // Tambah sedikit delay sebelum mencoba lagi
+                continue; // Lanjutkan ke iterasi berikutnya untuk mencoba ID baru
+            }
+            // Tangani error foreign key violation
+            else if (err.code === '23503') { // Foreign key violation
+                let detail = 'Pastikan Konselor NIK, Topik ID, dan Admin ID yang Anda pilih valid.';
+                if (err.constraint === 'fk_sesi_konselor') detail = 'Konselor yang dipilih tidak ditemukan.';
+                else if (err.constraint === 'fk_sesi_topik') detail = 'Topik yang dipilih tidak ditemukan.';
+                else if (err.constraint === 'fk_sesi_admin') detail = 'Admin untuk sesi tidak ditemukan.';
+                else if (err.constraint === 'fk_sesi_mahasiswa') detail = 'Mahasiswa untuk sesi tidak ditemukan.';
+                return res.status(400).json({ message: `Gagal membuat sesi: ${detail}` });
+            }
+            // Tangani error lainnya
+            else {
+                return res.status(500).send('Kesalahan server saat membuat sesi');
             }
         }
-
-        const result = await db.query(
-            `INSERT INTO Sesi (sesi_id, tanggal, status, catatan, Mahasiswa_NRP, Konselor_NIK, Admin_admin_id, Topik_topik_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-            [sesi_id, tanggal, status, catatan, mahasiswa_nrp, konselor_nik, admin_id, topik_id]
-        );
-        res.status(201).json({ message: 'Sesi konseling berhasil diminta', sesi: result.rows[0] });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
     }
+
+    // Jika mencapai batas maksimal percobaan dan masih gagal membuat ID unik
+    console.error(`Max retries (${maxRetries}) reached for sesi creation. Failed to generate unique ID.`);
+    return res.status(500).json({ message: 'Gagal membuat sesi: Tidak dapat menghasilkan ID unik setelah beberapa kali percobaan.' });
 };
+
+// --- Fungsi Controller Lainnya ---
 
 // Mendapatkan semua sesi (untuk admin)
 const getAllSesi = async (req, res) => {
@@ -156,161 +237,161 @@ const getSesiForKonselor = async (req, res) => {
         `, [konselor_nik]);
         res.json(result.rows);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
-    }
-};
-
-// Memperbarui status dan/atau catatan sesi (oleh konselor atau admin)
-const updateSesi = async (req, res) => {
-    const { id } = req.params;
-    const { status, catatan } = req.body;
-    const { role, user_id, entity_id } = req.user; // entity_id akan berisi NIK konselor atau admin_id
-
-    try {
-        const sesi = await db.query('SELECT * FROM Sesi WHERE sesi_id = $1', [id]);
-        if (sesi.rows.length === 0) {
-            return res.status(404).json({ message: 'Sesi tidak ditemukan' });
+                console.error(err.message);
+            res.status(500).send('Kesalahan server');
         }
+    };
 
-        // Hanya konselor yang terkait atau admin yang bisa memperbarui
-        if (role === 'Konselor') {
-            // Memastikan konselor yang login adalah konselor yang ditugaskan untuk sesi ini
-            if (entity_id !== sesi.rows[0].konselor_nik) {
-                return res.status(403).json({ message: 'Tidak diizinkan untuk memperbarui sesi ini' });
+    // Memperbarui status dan/atau catatan sesi (oleh konselor atau admin)
+    const updateSesi = async (req, res) => {
+        const { id } = req.params;
+        const { status, catatan } = req.body;
+        const { role, user_id, entity_id } = req.user; // entity_id akan berisi NIK konselor atau admin_id
+
+        try {
+            const sesi = await db.query('SELECT * FROM Sesi WHERE sesi_id = $1', [id]);
+            if (sesi.rows.length === 0) {
+                return res.status(404).json({ message: 'Sesi tidak ditemukan' });
             }
-        } else if (role !== 'Admin') {
-            return res.status(403).json({ message: 'Tidak diizinkan untuk memperbarui sesi' });
+
+            // Hanya konselor yang terkait atau admin yang bisa memperbarui
+            if (role === 'Konselor') {
+                // Memastikan konselor yang login adalah konselor yang ditugaskan untuk sesi ini
+                if (entity_id !== sesi.rows[0].konselor_nik) {
+                    return res.status(403).json({ message: 'Tidak diizinkan untuk memperbarui sesi ini' });
+                }
+            } else if (role !== 'Admin') {
+                return res.status(403).json({ message: 'Tidak diizinkan untuk memperbarui sesi' });
+            }
+
+            const updateFields = [];
+            const updateValues = [];
+            let paramIndex = 1;
+
+            if (status) {
+                updateFields.push(`status = $${paramIndex++}`);
+                updateValues.push(status);
+            }
+            if (catatan !== undefined) { // Izinkan catatan menjadi null
+                updateFields.push(`catatan = $${paramIndex++}`);
+                updateValues.push(catatan);
+            }
+
+            if (updateFields.length === 0) {
+                return res.status(400).json({ message: 'Tidak ada bidang yang disediakan untuk pembaruan' });
+            }
+
+            const query = `UPDATE Sesi SET ${updateFields.join(', ')} WHERE sesi_id = $${paramIndex} RETURNING sesi_id`;
+            updateValues.push(id);
+
+            const result = await db.query(query, updateValues);
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: 'Sesi tidak ditemukan' });
+            }
+            res.json({ message: 'Sesi berhasil diperbarui', sesi_id: result.rows[0].sesi_id });
+        } catch (err) {
+            console.error(err.message);
+            res.status(500).send('Kesalahan server');
         }
+    };
 
-        const updateFields = [];
-        const updateValues = [];
-        let paramIndex = 1;
-
-        if (status) {
-            updateFields.push(`status = $${paramIndex++}`);
-            updateValues.push(status);
+    // Menghapus sesi (hanya admin)
+    const deleteSesi = async (req, res) => {
+        const { id } = req.params;
+        try {
+            const result = await db.query('DELETE FROM Sesi WHERE sesi_id = $1 RETURNING sesi_id', [id]);
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: 'Sesi tidak ditemukan' });
+            }
+            res.json({ message: 'Sesi berhasil dihapus' });
+        } catch (err) {
+            console.error(err.message);
+            res.status(500).send('Kesalahan server');
         }
-        if (catatan !== undefined) { // Izinkan catatan menjadi null
-            updateFields.push(`catatan = $${paramIndex++}`);
-            updateValues.push(catatan);
+    };
+
+    // Menampilkan sesi selesai milik konselor dalam periode tertentu
+    const getSesiSelesaiKonselor = async (req, res) => {
+        try {
+            // Dapatkan NIK konselor yang sedang login
+            const konselors = await db.query('SELECT NIK FROM Konselor WHERE User_user_id = $1', [req.user.user_id]);
+            if (konselors.rows.length === 0) {
+                return res.status(403).json({ message: 'Pengguna bukan konselor yang valid' });
+            }
+            const konselor_nik = konselors.rows[0].nik;
+
+            // Ambil parameter periode dari query string
+            const { start, end } = req.query;
+            if (!start || !end) {
+                return res.status(400).json({ message: 'Parameter start dan end (YYYY-MM-DD) wajib diisi' });
+            }
+
+            // Query sesi selesai
+            const result = await db.query(`
+                SELECT
+                    s.sesi_id,
+                    s.tanggal,
+                    s.status,
+                    s.catatan,
+                    m.nama AS mahasiswa_nama,
+                    t.topik_nama
+                FROM Sesi s
+                JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
+                JOIN Topik t ON s.Topik_topik_id = t.topik_id
+                WHERE s.Konselor_NIK = $1
+                  AND s.status = 'Selesai'
+                  AND s.tanggal BETWEEN $2 AND $3
+                ORDER BY s.tanggal DESC
+            `, [konselor_nik, start, end]);
+
+            res.json(result.rows);
+        } catch (err) {
+            console.error(err.message);
+            res.status(500).send('Kesalahan server');
         }
+    };
 
-        if (updateFields.length === 0) {
-            return res.status(400).json({ message: 'Tidak ada bidang yang disediakan untuk pembaruan' });
+    // Menampilkan sesi konseling oleh konselor dengan spesialisasi tertentu
+    const getSesiBySpesialisasi = async (req, res) => {
+        try {
+            const { spesialisasi } = req.query;
+            if (!spesialisasi) {
+                return res.status(400).json({ message: 'Parameter spesialisasi wajib diisi' });
+            }
+
+            const result = await db.query(`
+                SELECT
+                    s.sesi_id,
+                    s.tanggal,
+                    s.status,
+                    s.catatan,
+                    k.nama AS konselor_nama,
+                    k.spesialisasi,
+                    m.nama AS mahasiswa_nama,
+                    t.topik_nama
+                FROM Sesi s
+                JOIN Konselor k ON s.Konselor_NIK = k.NIK
+                JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
+                JOIN Topik t ON s.Topik_topik_id = t.topik_id
+                WHERE k.spesialisasi = $1
+                ORDER BY s.tanggal DESC
+            `, [spesialisasi]);
+
+            res.json(result.rows);
+        } catch (err) {
+            console.error(err.message);
+            res.status(500).send('Kesalahan server');
         }
-
-        const query = `UPDATE Sesi SET ${updateFields.join(', ')} WHERE sesi_id = $${paramIndex} RETURNING sesi_id`;
-        updateValues.push(id);
-
-        const result = await db.query(query, updateValues);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Sesi tidak ditemukan' });
-        }
-        res.json({ message: 'Sesi berhasil diperbarui', sesi_id: result.rows[0].sesi_id });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
-    }
-};
-
-// Menghapus sesi (hanya admin)
-const deleteSesi = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const result = await db.query('DELETE FROM Sesi WHERE sesi_id = $1 RETURNING sesi_id', [id]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Sesi tidak ditemukan' });
-        }
-        res.json({ message: 'Sesi berhasil dihapus' });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
-    }
-};
-
-// Menampilkan sesi selesai milik konselor dalam periode tertentu
-const getSesiSelesaiKonselor = async (req, res) => {
-    try {
-        // Dapatkan NIK konselor yang sedang login
-        const konselors = await db.query('SELECT NIK FROM Konselor WHERE User_user_id = $1', [req.user.user_id]);
-        if (konselors.rows.length === 0) {
-            return res.status(403).json({ message: 'Pengguna bukan konselor yang valid' });
-        }
-        const konselor_nik = konselors.rows[0].nik;
-
-        // Ambil parameter periode dari query string
-        const { start, end } = req.query;
-        if (!start || !end) {
-            return res.status(400).json({ message: 'Parameter start dan end (YYYY-MM-DD) wajib diisi' });
-        }
-
-        // Query sesi selesai
-        const result = await db.query(`
-            SELECT
-                s.sesi_id,
-                s.tanggal,
-                s.status,
-                s.catatan,
-                m.nama AS mahasiswa_nama,
-                t.topik_nama
-            FROM Sesi s
-            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
-            JOIN Topik t ON s.Topik_topik_id = t.topik_id
-            WHERE s.Konselor_NIK = $1
-              AND s.status = 'Selesai'
-              AND s.tanggal BETWEEN $2 AND $3
-            ORDER BY s.tanggal DESC
-        `, [konselor_nik, start, end]);
-
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
-    }
-};
-
-// Menampilkan sesi konseling oleh konselor dengan spesialisasi tertentu
-const getSesiBySpesialisasi = async (req, res) => {
-    try {
-        const { spesialisasi } = req.query;
-        if (!spesialisasi) {
-            return res.status(400).json({ message: 'Parameter spesialisasi wajib diisi' });
-        }
-
-        const result = await db.query(`
-            SELECT
-                s.sesi_id,
-                s.tanggal,
-                s.status,
-                s.catatan,
-                k.nama AS konselor_nama,
-                k.spesialisasi,
-                m.nama AS mahasiswa_nama,
-                t.topik_nama
-            FROM Sesi s
-            JOIN Konselor k ON s.Konselor_NIK = k.NIK
-            JOIN Mahasiswa m ON s.Mahasiswa_NRP = m.NRP
-            JOIN Topik t ON s.Topik_topik_id = t.topik_id
-            WHERE k.spesialisasi = $1
-            ORDER BY s.tanggal DESC
-        `, [spesialisasi]);
-
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Kesalahan server');
-    }
-};
+    };
 
 
-module.exports = {
-    createSesi,
-    getAllSesi,
-    getSesiForMahasiswa,
-    getSesiForKonselor,
-    updateSesi,
-    deleteSesi,
-    getSesiSelesaiKonselor,
-    getSesiBySpesialisasi
-};
+    module.exports = {
+        createSesi,
+        getAllSesi,
+        getSesiForMahasiswa,
+        getSesiForKonselor,
+        updateSesi,
+        deleteSesi,
+        getSesiSelesaiKonselor,
+        getSesiBySpesialisasi
+    };
