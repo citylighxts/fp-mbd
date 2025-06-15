@@ -25,7 +25,7 @@ const getKonselors = async (req, res) => {
                 k.spesialisasi,
                 k.kontak,
                 u.username,
-                ARRAY_AGG(t.topik_nama) FILTER (WHERE t.topik_nama IS NOT NULL) AS topik_nama
+                ARRAY_AGG(t.topik_nama)
             FROM Konselor k
             JOIN "User" u ON k.User_user_id = u.user_id
             LEFT JOIN Konselor_Topik kt ON k.NIK = kt.Konselor_NIK
@@ -258,6 +258,27 @@ const getSesiBySpesialisasi = async (req, res) => {
     }
 };
 
+const getKonselorTanpaSesi = async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT
+                k.NIK,
+                k.nama,
+                k.spesialisasi,
+                k.kontak,
+                u.username
+            FROM Konselor k
+            JOIN "User" u ON k.User_user_id = u.user_id
+            LEFT JOIN Sesi s ON k.NIK = s.Konselor_NIK
+            WHERE s.Konselor_NIK IS NULL;
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Error fetching konselor tanpa sesi:", err.message);
+        res.status(500).send('Kesalahan server saat mendapatkan konselor tanpa sesi');
+    }
+};
+
 
 module.exports = {
     getKonselors,
@@ -267,5 +288,6 @@ module.exports = {
     addKonselorTopik,
     removeKonselorTopik,
     getSesiSelesaiKonselor,
-    getSesiBySpesialisasi
+    getSesiBySpesialisasi,
+    getKonselorTanpaSesi
 };

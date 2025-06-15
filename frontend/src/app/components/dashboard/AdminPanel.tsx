@@ -83,6 +83,10 @@ export default function AdminPanel() {
   const [isMahasiswaFiltering, setIsMahasiswaFiltering] = useState<boolean>(false);
   const [mahasiswaFilterMessage, setMahasiswaFilterMessage] = useState<string>("");
 
+  // NEW: States for konselor filter (konselor tanpa sesi)
+  const [filteredKonselor, setFilteredKonselor] = useState<Konselor[]>([]);
+  const [isKonselorFiltering, setIsKonselorFiltering] = useState<boolean>(false);
+  const [konselorFilterMessage, setKonselorFilterMessage] = useState<string>("");
 
   // States untuk filter periode sesi selesai
   const [periode, setPeriode] = useState({ start: "", end: "" });
@@ -137,9 +141,12 @@ export default function AdminPanel() {
         setMahasiswaTopikFilter("");
         setMahasiswaFilterMessage("");
       } else if (tab === "konselor") {
-        // Konselor endpoint sudah mengambil topik_nama
         const response = await api.get<Konselor[]>("/konselors");
         setData((prev) => ({ ...prev, konselor: response.data }));
+        // Reset konselor filter when switching tabs or refreshing all data
+        setFilteredKonselor([]);
+        setIsKonselorFiltering(false); // Reset loading state
+        setKonselorFilterMessage(""); // Clear filter message
       } else if (tab === "topik") {
         const response = await api.get<Topik[]>("/topiks");
         setData((prev) => ({ ...prev, topik: response.data }));
@@ -234,6 +241,33 @@ export default function AdminPanel() {
     }
   };
 
+  // NEW: Fungsi untuk mendapatkan konselor yang belum pernah menangani sesi
+  const fetchKonselorTanpaSesi = async () => {
+    setIsKonselorFiltering(true);
+    setKonselorFilterMessage("");
+    setMessage(""); // Clear general message
+    setMessageType("info");
+
+    try {
+      const response = await api.get<Konselor[]>("/konselors/tanpa-sesi");
+      setFilteredKonselor(response.data);
+      if (response.data.length === 0) {
+        setKonselorFilterMessage("Tidak ada konselor yang belum pernah menangani sesi.");
+      } else {
+        setKonselorFilterMessage(`Menampilkan ${response.data.length} konselor yang belum pernah menangani sesi.`);
+      }
+      setMessageType("success");
+    } catch (error: any) {
+      setFilteredKonselor([]);
+      setKonselorFilterMessage(
+        error.response?.data?.message ||
+          "Gagal memuat daftar konselor tanpa sesi."
+      );
+      setMessageType("error");
+    } finally {
+      setIsKonselorFiltering(false);
+    }
+  };
 
   // Fungsi baru untuk memanggil endpoint rekap sesi selesai
   const fetchSesiSelesai = async () => {
@@ -913,6 +947,37 @@ export default function AdminPanel() {
         )}
         {/* --- END NEW FILTER MAHASISWA --- */}
 
+        {/* NEW: Filter Konselor yang Belum Pernah Menangani Sesi */}
+        {activeTab === "konselor" && (
+            <div className="mb-4 flex flex-col md:flex-row md:items-end gap-2">
+                <button
+                    className="btn-primary mt-2 md:mt-0"
+                    onClick={fetchKonselorTanpaSesi}
+                    disabled={isKonselorFiltering}
+                >
+                    {isKonselorFiltering ? "Memuat..." : "Tampilkan Konselor Tanpa Sesi"}
+                </button>
+                {(filteredKonselor.length > 0 || konselorFilterMessage) && (
+                    <button
+                        className="btn-secondary ml-2"
+                        onClick={() => {
+                            setFilteredKonselor([]);
+                            setKonselorFilterMessage("");
+                            setMessage(""); // Clear general message
+                            fetchData("konselor"); // Reload all konselor data
+                        }}
+                    >
+                        Reset Filter
+                    </button>
+                )}
+            </div>
+        )}
+        {konselorFilterMessage && (
+             <div className={`mb-4 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                {konselorFilterMessage}
+            </div>
+        )}
+        {/* --- END NEW FILTER KONSELOR --- */}
 
         {activeTab === "session" && (
           <>
@@ -1201,8 +1266,8 @@ export default function AdminPanel() {
                         >
                           <FaTrash />
                         </button>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
                   ))}
                 {activeTab === "admin" &&
                   data.admin.map((item) => (
@@ -1253,8 +1318,12 @@ export default function AdminPanel() {
                     </tr>
                   ))
                 )}
-                {activeTab === "konselor" &&
-                  data.konselor.map((item) => (
+                {activeTab === "konselor" && (
+                  // Conditional rendering based on whether filtering is active and has results
+                  (isKonselorFiltering || filteredKonselor.length > 0
+                    ? filteredKonselor
+                    : data.konselor
+                  ).map((item) => (
                     <tr key={item.nik}>
                       <td className="py-2 px-4 border-b">{item.nik}</td>
                       <td className="py-2 px-4 border-b">{item.nama}</td>
@@ -1277,7 +1346,8 @@ export default function AdminPanel() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                )}
                 {activeTab === "topik" &&
                   data.topik.map((item) => (
                     <tr key={item.topik_id}>
@@ -1358,7 +1428,7 @@ export default function AdminPanel() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                      </td>
+                          </td>
                       <td className="py-2 px-4 border-b">
                         {statusLabels[item.status] || item.status}
                       </td>
@@ -1374,23 +1444,23 @@ export default function AdminPanel() {
                       <td className="py-2 px-4 border-b">
                         {item.catatan || "-"}
                       </td>
-                      <td className="py-2 px-4 border-b text-center">
-                        <button
-                          onClick={() => openModal("edit", item)}
-                          className="text-blue-600 hover:text-blue-800 mr-2"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => openModal("delete", item)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <FaTrash />
-                        </button>
-                      </td>
+                        <td className="py-2 px-4 border-b text-center">
+                          <button
+                            onClick={() => openModal("edit", item)}
+                            className="text-blue-600 hover:text-blue-800 mr-2"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            onClick={() => openModal("delete", item)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
                     </tr>
                   ))
-                )}
+                      )}
               </tbody>
             </table>
           </div>
