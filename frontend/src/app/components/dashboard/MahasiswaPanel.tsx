@@ -26,6 +26,7 @@ export default function MahasiswaPanel() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedKonselor, setSelectedKonselor] = useState<string>("");
   const [selectedTopik, setSelectedTopik] = useState<string>("");
+  const [selectedRequestedDate, setSelectedRequestedDate] = useState<string>(""); // State baru untuk tanggal permintaan
 
   const fetchMahasiswaData = async () => {
     setLoading(true);
@@ -69,24 +70,22 @@ export default function MahasiswaPanel() {
       );
 
       if (konselorObj && konselorObj.topik_nama && konselorObj.topik_nama.length > 0 && konselorObj.topik_nama[0] !== null) {
-        // Filter allTopics jika topik_nama konselor ada dan bukan null
         const topicsForSelectedKonselor = allTopics.filter((topic) =>
           konselorObj.topik_nama?.includes(topic.topik_nama)
         );
         setFilteredTopics(topicsForSelectedKonselor);
-        // Reset selectedTopik jika topik yang dipilih sebelumnya tidak ada di filteredTopics baru
         if (!topicsForSelectedKonselor.some(t => t.topik_id === selectedTopik)) {
             setSelectedTopik('');
         }
       } else {
-        setFilteredTopics([]); // Jika konselor tidak punya topik spesifik
-        setSelectedTopik(''); // Reset selectedTopik
+        setFilteredTopics([]);
+        setSelectedTopik('');
       }
     } else {
-      setFilteredTopics([]); // Jika tidak ada konselor dipilih atau belum ada topik
-      setSelectedTopik(''); // Reset selectedTopik
+      setFilteredTopics([]);
+      setSelectedTopik('');
     }
-  }, [selectedKonselor, allTopics, konselors, selectedTopik]); // Tambahkan selectedTopik ke dependencies
+  }, [selectedKonselor, allTopics, konselors, selectedTopik]); 
 
   const handleRequestSesi = async (e: FormEvent) => {
     e.preventDefault();
@@ -95,13 +94,22 @@ export default function MahasiswaPanel() {
     setModalMessageType("");
 
     try {
+      if (!selectedRequestedDate) {
+        setModalMessage("Pilih tanggal permintaan sesi.");
+        setModalMessageType("error");
+        setLoading(false);
+        return;
+      }
+      
       console.log("Data yang akan dikirim ke backend:", {
         konselor_nik: selectedKonselor,
         topik_id: selectedTopik,
+        tanggal: selectedRequestedDate, // Kirim tanggal yang dipilih mahasiswa
       });
       await api.post("/sesi", {
         konselor_nik: selectedKonselor,
         topik_id: selectedTopik,
+        tanggal: selectedRequestedDate, // Gunakan tanggal yang dipilih
       });
       setModalMessage("Permintaan sesi berhasil diajukan!");
       setModalMessageType("success");
@@ -122,6 +130,7 @@ export default function MahasiswaPanel() {
     setIsModalOpen(false);
     setSelectedKonselor("");
     setSelectedTopik("");
+    setSelectedRequestedDate(""); // Reset tanggal yang dipilih
     setModalMessage("");
     setModalMessageType("");
   };
@@ -180,6 +189,27 @@ export default function MahasiswaPanel() {
             ) : (
               <p className="text-gray-500">Tidak ada konselor yang tersedia.</p>
             )}
+            <h3 className="text-xl font-semibold text-gray-700 mt-6 mb-3">
+              Topik Konseling (berdasarkan Konselor Terpilih di Modal)
+            </h3>
+            {filteredTopics.length > 0 ? ( 
+              <ul className="space-y-2">
+                {filteredTopics.map((topik) => (
+                  <li
+                    key={topik.topik_id}
+                    className="bg-gray-50 p-3 rounded-md shadow-sm"
+                  >
+                    <p className="font-semibold text-gray-900">
+                      {topik.topik_nama}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-500">
+                Pilih konselor di modal untuk melihat topik yang tersedia, atau konselor terpilih tidak memiliki topik.
+              </p>
+            )}
           </div>
         </div>
 
@@ -199,7 +229,7 @@ export default function MahasiswaPanel() {
                     Sesi ID: {s.sesi_id}
                   </p>
                   <p className="text-gray-700">
-                    Tanggal: {new Date(s.tanggal).toLocaleString()}
+                    Tanggal Permintaan: {new Date(s.tanggal).toLocaleString()} {/* Ini tanggal permintaan */}
                   </p>
                   <p className="text-gray-700">
                     Konselor: {s.konselor_nama} ({s.konselor_spesialisasi})
@@ -291,6 +321,18 @@ export default function MahasiswaPanel() {
                     Pilih konselor terlebih dahulu untuk melihat topik.
                   </p>
                 )}
+              </div>
+              {/* Input Tanggal Permintaan */}
+              <div>
+                <label htmlFor="requestedDate">Tanggal yang Diminta:</label>
+                <input
+                  type="date"
+                  id="requestedDate"
+                  value={selectedRequestedDate}
+                  onChange={(e) => setSelectedRequestedDate(e.target.value)}
+                  required
+                  className="w-full p-2 border rounded"
+                />
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <button

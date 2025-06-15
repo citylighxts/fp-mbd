@@ -3,7 +3,6 @@ const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid'); // Masih digunakan untuk User/Admin ID di authController
 
 // Fungsi utilitas untuk menghasilkan ID CHAR(4) acak (digunakan untuk User/Admin ID di authController)
-// Ini tidak digunakan untuk sesi_id
 const generateCharId = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -13,7 +12,7 @@ const generateCharId = () => {
     return result;
 };
 
-// Fungsi untuk mendapatkan nomor sesi terakhir dari database
+// Fungsi untuk mendapatkan nomor sesi terakhir (misalnya dari 'S005' akan mengembalikan 5)
 const getLatestSesiNumber = async () => {
     try {
         console.log('Fetching latest sesi_id from DB...');
@@ -31,23 +30,23 @@ const getLatestSesiNumber = async () => {
         }
     } catch (error) {
         console.error("Error getting latest sesi number from DB (will default to 0):", error.message);
-        console.error("Detailed DB error:", error); // Log the full error
-        // Jika ada error atau belum ada sesi dengan format 'S###', mulai dari 0
+        console.error("Detailed DB error:", error); 
         return 0;
     }
     console.log('No existing sesi_id with "S###" format found. Starting from 0.');
-    return 0; // Jika tidak ada sesi yang cocok dengan pola 'S###'
+    return 0; 
 };
+
 
 // Membuat sesi baru (oleh mahasiswa)
 const createSesi = async (req, res) => {
-    const { konselor_nik, topik_id } = req.body;
-    const tanggal = new Date(); // Waktu saat ini
+    // Ambil tanggal dari request body
+    const { konselor_nik, topik_id, tanggal } = req.body; 
     const status = 'Requested'; // Status awal
     const catatan = null; // Awalnya catatan kosong
 
     console.log('--- Create Sesi Request Received ---');
-    console.log('Request data:', { konselor_nik, topik_id });
+    console.log('Request data:', { konselor_nik, topik_id, tanggal }); // Log tanggal juga
 
     // Validasi pengguna yang login
     if (!req.user || !req.user.user_id || req.user.role !== 'Mahasiswa') {
@@ -87,28 +86,30 @@ const createSesi = async (req, res) => {
         return res.status(500).json({ message: 'Gagal mendapatkan admin_id untuk sesi' });
     }
 
-    // Validasi input wajib dari request body
-    if (!konselor_nik || !topik_id) {
-        console.error('Error: Missing Konselor NIK, or Topik ID in request body.');
-        return res.status(400).json({ message: 'Konselor dan Topik wajib untuk membuat sesi.' });
+    // Validasi input wajib dari request body (termasuk tanggal)
+    if (!konselor_nik || !topik_id || !tanggal) {
+        console.error('Error: Missing Konselor NIK, Topik ID, or Tanggal in request body.');
+        return res.status(400).json({ message: 'Konselor, Topik, dan Tanggal wajib untuk membuat sesi.' });
+    }
+
+    // Validasi format tanggal (opsional, tapi disarankan)
+    if (isNaN(new Date(tanggal).getTime())) {
+        console.error('Error: Invalid date format received for tanggal:', tanggal);
+        return res.status(400).json({ message: 'Format tanggal tidak valid. Gunakan YYYY-MM-DD.' });
     }
 
     let sesi_id;
-    let maxRetries = 5; // Maksimal percobaan untuk ID unik jika ada konflik
+    let maxRetries = 5; 
     let currentRetry = 0;
 
-    // Loop untuk mencoba membuat sesi dengan ID unik (handle concurrency)
     while (currentRetry < maxRetries) {
         try {
-            // Dapatkan nomor sesi terakhir dan increment
-            // Pastikan getLatestSesiNumber didefinisikan sebelum createSesi
             const latestNumber = await getLatestSesiNumber(); 
             const newNumber = latestNumber + 1;
-            sesi_id = `S${String(newNumber).padStart(3, '0')}`; // Format ke S001, S002, dst.
+            sesi_id = `S${String(newNumber).padStart(3, '0')}`; 
 
             console.log(`Attempting to create sesi with generated sesi_id: ${sesi_id} (Attempt ${currentRetry + 1}/${maxRetries})`);
 
-            // Masukkan sesi ke database
             const result = await db.query(
                 `INSERT INTO Sesi (sesi_id, tanggal, status, catatan, Mahasiswa_NRP, Konselor_NIK, Admin_admin_id, Topik_topik_id)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -121,15 +122,13 @@ const createSesi = async (req, res) => {
             console.error(`Error creating sesi with sesi_id ${sesi_id}:`, err.message);
             console.error('Detailed Sesi creation error:', err);
 
-            // Tangani error jika ID duplikat (kemungkinan karena concurrency)
-            if (err.code === '23505' && err.constraint === 'sesi_pkey') { // 'sesi_pkey' adalah nama default primary key constraint
+            if (err.code === '23505' && err.constraint === 'sesi_pkey') { 
                 console.warn(`Duplicate sesi_id ${sesi_id} detected. Retrying...`);
                 currentRetry++;
-                await new Promise(resolve => setTimeout(resolve, 50 + currentRetry * 20)); // Tambah sedikit delay sebelum mencoba lagi
-                continue; // Lanjutkan ke iterasi berikutnya untuk mencoba ID baru
+                await new Promise(resolve => setTimeout(resolve, 50 + currentRetry * 20)); 
+                continue; 
             }
-            // Tangani error foreign key violation
-            else if (err.code === '23503') { // Foreign key violation
+            else if (err.code === '23503') { 
                 let detail = 'Pastikan Konselor NIK, Topik ID, dan Admin ID yang Anda pilih valid.';
                 if (err.constraint === 'fk_sesi_konselor') detail = 'Konselor yang dipilih tidak ditemukan.';
                 else if (err.constraint === 'fk_sesi_topik') detail = 'Topik yang dipilih tidak ditemukan.';
@@ -137,14 +136,12 @@ const createSesi = async (req, res) => {
                 else if (err.constraint === 'fk_sesi_mahasiswa') detail = 'Mahasiswa untuk sesi tidak ditemukan.';
                 return res.status(400).json({ message: `Gagal membuat sesi: ${detail}` });
             }
-            // Tangani error lainnya
             else {
                 return res.status(500).send('Kesalahan server saat membuat sesi');
             }
         }
     }
 
-    // Jika mencapai batas maksimal percobaan dan masih gagal membuat ID unik
     console.error(`Max retries (${maxRetries}) reached for sesi creation. Failed to generate unique ID.`);
     return res.status(500).json({ message: 'Gagal membuat sesi: Tidak dapat menghasilkan ID unik setelah beberapa kali percobaan.' });
 };
@@ -256,7 +253,6 @@ const getSesiForKonselor = async (req, res) => {
 
             // Hanya konselor yang terkait atau admin yang bisa memperbarui
             if (role === 'Konselor') {
-                // Memastikan konselor yang login adalah konselor yang ditugaskan untuk sesi ini
                 if (entity_id !== sesi.rows[0].konselor_nik) {
                     return res.status(403).json({ message: 'Tidak diizinkan untuk memperbarui sesi ini' });
                 }
@@ -272,7 +268,7 @@ const getSesiForKonselor = async (req, res) => {
                 updateFields.push(`status = $${paramIndex++}`);
                 updateValues.push(status);
             }
-            if (catatan !== undefined) { // Izinkan catatan menjadi null
+            if (catatan !== undefined) { 
                 updateFields.push(`catatan = $${paramIndex++}`);
                 updateValues.push(catatan);
             }
@@ -313,20 +309,17 @@ const getSesiForKonselor = async (req, res) => {
     // Menampilkan sesi selesai milik konselor dalam periode tertentu
     const getSesiSelesaiKonselor = async (req, res) => {
         try {
-            // Dapatkan NIK konselor yang sedang login
             const konselors = await db.query('SELECT NIK FROM Konselor WHERE User_user_id = $1', [req.user.user_id]);
             if (konselors.rows.length === 0) {
                 return res.status(403).json({ message: 'Pengguna bukan konselor yang valid' });
             }
             const konselor_nik = konselors.rows[0].nik;
 
-            // Ambil parameter periode dari query string
             const { start, end } = req.query;
             if (!start || !end) {
                 return res.status(400).json({ message: 'Parameter start dan end (YYYY-MM-DD) wajib diisi' });
             }
 
-            // Query sesi selesai
             const result = await db.query(`
                 SELECT
                     s.sesi_id,
@@ -383,7 +376,6 @@ const getSesiForKonselor = async (req, res) => {
             res.status(500).send('Kesalahan server');
         }
     };
-
 
     module.exports = {
         createSesi,
