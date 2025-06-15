@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getMahasiswas,
   getMahasiswaByNRP,
+  getMahasiswaByTopik,
   updateMahasiswa,
   deleteMahasiswa,
   ajukanSesiKonseling
@@ -23,6 +24,13 @@ router.get(
   protect,
   authorizeRoles('Admin'),
   getMahasiswas
+);
+
+router.get(
+  '/by-topik', // This path should come BEFORE /:nrp to avoid conflicts
+  protect,
+  authorizeRoles('Admin'),
+  getMahasiswaByTopik
 );
 
 // GET mahasiswa by NRP (admin atau mahasiswa itu sendiri)
@@ -61,6 +69,5 @@ router.post(
   authorizeRoles('Mahasiswa'),
   ajukanSesiKonseling
 );
-
 
 module.exports = router;

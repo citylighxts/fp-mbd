@@ -3,8 +3,8 @@
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../lib/api";
-import LoadingSpinner from "../LoadingSpinner";
-import MessageDisplay from "../MessageDisplay";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import MessageDisplay from "../../components/MessageDisplay";
 import {
   FaUser,
   FaUserTie,
@@ -64,9 +64,17 @@ export default function AdminPanel() {
   });
   const [loading, setLoading] = useState<boolean>(false);
 
+  // States untuk filter sesi berdasarkan spesialisasi konselor
   const [spesialisasiFilter, setSpesialisasiFilter] = useState<string>("");
   const [filteredsession, setFilteredsession] = useState<Sesi[]>([]);
   const [isFiltering, setIsFiltering] = useState<boolean>(false);
+
+  // NEW: States untuk filter mahasiswa berdasarkan topik
+  const [mahasiswaTopikFilter, setMahasiswaTopikFilter] = useState<string>("");
+  const [filteredMahasiswa, setFilteredMahasiswa] = useState<Mahasiswa[]>([]);
+  const [isMahasiswaFiltering, setIsMahasiswaFiltering] = useState<boolean>(false);
+  const [mahasiswaFilterMessage, setMahasiswaFilterMessage] = useState<string>("");
+
 
   const [periode, setPeriode] = useState({ start: "", end: "" });
   const [sesiSelesai, setSesiSelesai] = useState<Sesi[]>([]);
@@ -114,6 +122,10 @@ export default function AdminPanel() {
       } else if (tab === "mahasiswa") {
         const response = await api.get<Mahasiswa[]>("/mahasiswas");
         setData((prev) => ({ ...prev, mahasiswa: response.data }));
+        // Reset filter mahasiswa saat pindah tab atau refresh semua
+        setFilteredMahasiswa([]);
+        setMahasiswaTopikFilter("");
+        setMahasiswaFilterMessage("");
       } else if (tab === "konselor") {
         // Konselor endpoint sudah mengambil topik_nama
         const response = await api.get<Konselor[]>("/konselors");
@@ -176,6 +188,41 @@ export default function AdminPanel() {
       setIsFiltering(false);
     }
   };
+
+  // NEW: Fungsi untuk mendapatkan mahasiswa berdasarkan topik
+  const fetchMahasiswaByTopik = async () => {
+    if (!mahasiswaTopikFilter) {
+      setMahasiswaFilterMessage("Masukkan nama topik untuk memfilter.");
+      setMessageType("error");
+      return;
+    }
+    setIsMahasiswaFiltering(true);
+    setMahasiswaFilterMessage("");
+    try {
+      const response = await api.get<Mahasiswa[]>(
+        `/mahasiswas/by-topik?topikNama=${encodeURIComponent(
+          mahasiswaTopikFilter
+        )}`
+      );
+      setFilteredMahasiswa(response.data);
+      if (response.data.length === 0) {
+        setMahasiswaFilterMessage(`Tidak ada mahasiswa yang ditemukan untuk topik "${mahasiswaTopikFilter}".`);
+      } else {
+        setMahasiswaFilterMessage(`Menampilkan mahasiswa yang pernah sesi dengan topik "${mahasiswaTopikFilter}".`);
+      }
+      setMessageType("success");
+    } catch (error: any) {
+      setFilteredMahasiswa([]);
+      setMahasiswaFilterMessage(
+        error.response?.data?.message ||
+          "Gagal memuat mahasiswa untuk topik ini."
+      );
+      setMessageType("error");
+    } finally {
+      setIsMahasiswaFiltering(false);
+    }
+  };
+
 
   const fetchSesiSelesai = async () => {
     if (!periode.start || !periode.end) {
@@ -763,6 +810,56 @@ export default function AdminPanel() {
           </button>
         )}
 
+        {/* NEW: Filter Mahasiswa berdasarkan Topik */}
+        {activeTab === "mahasiswa" && (
+            <div className="mb-4 flex flex-col md:flex-row md:items-end gap-2">
+                <div>
+                    <label
+                        htmlFor="mahasiswaTopikFilter"
+                        className="block text-sm font-medium text-gray-700"
+                    >
+                        Filter Mahasiswa Berdasarkan Topik Sesi:
+                    </label>
+                    <input
+                        id="mahasiswaTopikFilter"
+                        type="text"
+                        className="border rounded px-2 py-1 w-60"
+                        placeholder="Masukkan nama topik, misal: Stres Akademik"
+                        value={mahasiswaTopikFilter}
+                        onChange={(e) => setMahasiswaTopikFilter(e.target.value)}
+                    />
+                </div>
+                <button
+                    className="btn-primary mt-2 md:mt-0"
+                    onClick={fetchMahasiswaByTopik}
+                    disabled={isMahasiswaFiltering}
+                >
+                    {isMahasiswaFiltering ? "Memuat..." : "Tampilkan Mahasiswa"}
+                </button>
+                {(filteredMahasiswa.length > 0 || mahasiswaFilterMessage) && (
+                    <button
+                        className="btn-secondary ml-2"
+                        onClick={() => {
+                            setFilteredMahasiswa([]);
+                            setMahasiswaTopikFilter("");
+                            setMahasiswaFilterMessage("");
+                            setMessage(""); // Bersihkan pesan umum juga
+                            fetchData("mahasiswa"); // Muat ulang semua data mahasiswa
+                        }}
+                    >
+                        Reset Filter
+                    </button>
+                )}
+            </div>
+        )}
+        {mahasiswaFilterMessage && (
+             <div className={`mb-4 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                {mahasiswaFilterMessage}
+            </div>
+        )}
+        {/* --- END NEW FILTER MAHASISWA --- */}
+
+
         {activeTab === "session" && (
           <>
             {/* --- FILTER SPESIALISASI --- */}
@@ -1048,7 +1145,10 @@ export default function AdminPanel() {
                     </tr>
                   ))}
                 {activeTab === "mahasiswa" &&
-                  data.mahasiswa.map((item: Mahasiswa) => (
+                  (filteredMahasiswa.length > 0 && mahasiswaTopikFilter // Tampilkan filteredMahasiswa jika ada filter
+                    ? filteredMahasiswa
+                    : data.mahasiswa // Jika tidak ada filter, tampilkan semua data.mahasiswa
+                  ).map((item: Mahasiswa) => (
                     <tr key={item.nrp} className="hover:bg-gray-50">
                       <td className="py-2 px-4 border-b text-sm text-gray-700">
                         {item.nrp}
@@ -1197,10 +1297,24 @@ export default function AdminPanel() {
                       </td>
                     </tr>
                   ))}
-                {data[activeTab]?.length === 0 && (
+                {(
+                    (activeTab === "mahasiswa" && (filteredMahasiswa.length === 0 && mahasiswaTopikFilter && !isMahasiswaFiltering)) ||
+                    (activeTab === "mahasiswa" && !mahasiswaTopikFilter && data.mahasiswa.length === 0 && !loading) ||
+                    (activeTab === "session" && (filteredsession.length === 0 && spesialisasiFilter && !isFiltering)) ||
+                    (activeTab === "session" && !spesialisasiFilter && data.session.length === 0 && !loading) ||
+                    (activeTab !== "mahasiswa" && activeTab !== "session" && data[activeTab]?.length === 0 && !loading)
+                ) && (
                   <tr>
                     <td
-                      colSpan={Object.keys(data[activeTab][0] || {}).length + 2}
+                      colSpan={
+                        activeTab === "users" ? 4 :
+                        activeTab === "admin" ? 4 :
+                        activeTab === "mahasiswa" ? 5 :
+                        activeTab === "konselor" ? 6 :
+                        activeTab === "topik" ? 3 :
+                        activeTab === "session" ? 8 :
+                        1
+                      }
                       className="py-4 px-4 text-center text-gray-500"
                     >
                       Tidak ada data untuk ditampilkan.
