@@ -4,37 +4,17 @@ const { v4: uuidv4 } = require('uuid');
 // Mendapatkan semua konselor beserta topiknya
 const getKonselors = async (req, res) => {
     try {
-        const { userId } = req.query;
-        let query = `
-            SELECT
-                k.NIK,
-                k.nama,
-                k.spesialisasi,
-                k.kontak,
-                u.username,
-                ARRAY_AGG(t.topik_nama) FILTER (WHERE t.topik_nama IS NOT NULL) AS topik_nama
-            FROM Konselor k
-            JOIN "User" u ON k.User_user_id = u.user_id
-            LEFT JOIN Konselor_Topik kt ON k.NIK = kt.Konselor_NIK
-            LEFT JOIN Topik t ON kt.Topik_topik_id = t.topik_id
-        `;
-        const params = [];
+        // Menggunakan query paling sederhana untuk menjamin data NIK benar.
+        const result = await db.query('SELECT NIK, nama, spesialisasi, kontak FROM konselor ORDER BY nama ASC');
 
-        if (userId) {
-            query += ` WHERE u.user_id = $1`;
-            params.push(userId);
-        }
+        // Mengirim data yang sudah pasti benar ke frontend.
+    res.json(result.rows);
 
-        query += ` GROUP BY k.NIK, k.nama, k.spesialisasi, k.kontak, u.username ORDER BY k.nama;`;
-
-        const result = await db.query(query, params);
-        res.json(result.rows);
     } catch (err) {
-        console.error(err.message);
+        console.error("Error di getKonselors:", err.message);
         res.status(500).send('Kesalahan server');
-    }
+}
 };
-
 // Mendapatkan konselor berdasarkan NIK beserta topiknya
 const getKonselorByNIK = async (req, res) => {
     const { nik } = req.params;

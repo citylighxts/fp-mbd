@@ -21,7 +21,7 @@ export interface Mahasiswa {
 }
 
 export interface Konselor {
-  NIK: string;
+  nik: string;
   nama: string;
   spesialisasi: string;
   kontak: string;

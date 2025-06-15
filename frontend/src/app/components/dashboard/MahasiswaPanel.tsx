@@ -33,6 +33,9 @@ export default function MahasiswaPanel() {
     try {
       // Fetch Konselors
       const konselorRes = await api.get<Konselor[]>("/konselors");
+      // --- LOG UNTUK MELIHAT DATA MENTAH ---
+      console.log("DATA MENTAH KONSELOR DARI API:", konselorRes.data);
+      // ----------------------------------------------------
       setKonselors(konselorRes.data);
 
       // Fetch Topics
@@ -67,6 +70,10 @@ export default function MahasiswaPanel() {
     setModalMessageType("");
 
     try {
+      console.log("Data yang akan dikirim ke backend:", {
+        konselor_nik: selectedKonselor,
+        topik_id: selectedTopik,
+      });
       await api.post("/sesi", {
         konselor_nik: selectedKonselor,
         topik_id: selectedTopik,
@@ -126,7 +133,7 @@ export default function MahasiswaPanel() {
               <ul className="space-y-2">
                 {konselors.map((konselor) => (
                   <li
-                    key={konselor.NIK}
+                    key={konselor.nik}
                     className="bg-gray-50 p-3 rounded-md shadow-sm"
                   >
                     <p className="font-semibold text-gray-900">
@@ -236,17 +243,28 @@ export default function MahasiswaPanel() {
                 <select
                   id="konselor"
                   value={selectedKonselor}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                    setSelectedKonselor(e.target.value)
-                  }
+                  onChange={(e) => setSelectedKonselor(e.target.value)}
                   required
+                  className="w-full p-2 border rounded"
                 >
                   <option value="">-- Pilih Konselor --</option>
-                  {konselors.map((k) => (
-                    <option key={k.NIK} value={k.NIK}>
-                      {k.nama} ({k.spesialisasi})
-                    </option>
-                  ))}
+                  {konselors.map((k, index) => {
+                    // --- LOGGING DI DALAM MAP UNTUK MEMBONGKAR DATA ---
+                    // Kita hanya log untuk item pertama agar console tidak penuh
+                    if (index === 0) {
+                      console.log(
+                        "MEMERIKSA OBJEK 'k' PERTAMA DI DALAM .map():",
+                        k
+                      );
+                      console.log("--> Mencoba set 'value' ke:", k.nik);
+                    }
+                    // --- AKHIR LOGGING ---
+                    return (
+                      <option key={k.nik} value={k.nik}>
+                        {k.nama} ({k.spesialisasi})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
