@@ -11,7 +11,8 @@ import { FaCalendarPlus, FaUserMd, FaTags, FaBookOpen } from "react-icons/fa";
 export default function MahasiswaPanel() {
   const { user } = useAuth();
   const [konselors, setKonselors] = useState<Konselor[]>([]);
-  const [topics, setTopics] = useState<Topik[]>([]);
+  const [allTopics, setAllTopics] = useState<Topik[]>([]); // Menyimpan semua topik
+  const [filteredTopics, setFilteredTopics] = useState<Topik[]>([]); // Topik yang difilter sesuai konselor
   const [sesi, setSesi] = useState<Sesi[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
@@ -33,14 +34,11 @@ export default function MahasiswaPanel() {
     try {
       // Fetch Konselors
       const konselorRes = await api.get<Konselor[]>("/konselors");
-      // --- LOG UNTUK MELIHAT DATA MENTAH ---
-      console.log("DATA MENTAH KONSELOR DARI API:", konselorRes.data);
-      // ----------------------------------------------------
       setKonselors(konselorRes.data);
 
-      // Fetch Topics
+      // Fetch ALL Topics
       const topikRes = await api.get<Topik[]>("/topiks");
-      setTopics(topikRes.data);
+      setAllTopics(topikRes.data); // Simpan semua topik di allTopics
 
       // Fetch Sesi for Mahasiswa
       const sesiRes = await api.get<Sesi[]>("/sesi/mahasiswa");
@@ -62,6 +60,33 @@ export default function MahasiswaPanel() {
       fetchMahasiswaData();
     }
   }, [user]);
+
+  // Efek untuk memfilter topik berdasarkan konselor yang dipilih
+  useEffect(() => {
+    if (selectedKonselor && allTopics.length > 0 && konselors.length > 0) {
+      const konselorObj = konselors.find(
+        (k) => k.nik === selectedKonselor
+      );
+
+      if (konselorObj && konselorObj.topik_nama && konselorObj.topik_nama.length > 0 && konselorObj.topik_nama[0] !== null) {
+        // Filter allTopics jika topik_nama konselor ada dan bukan null
+        const topicsForSelectedKonselor = allTopics.filter((topic) =>
+          konselorObj.topik_nama?.includes(topic.topik_nama)
+        );
+        setFilteredTopics(topicsForSelectedKonselor);
+        // Reset selectedTopik jika topik yang dipilih sebelumnya tidak ada di filteredTopics baru
+        if (!topicsForSelectedKonselor.some(t => t.topik_id === selectedTopik)) {
+            setSelectedTopik('');
+        }
+      } else {
+        setFilteredTopics([]); // Jika konselor tidak punya topik spesifik
+        setSelectedTopik(''); // Reset selectedTopik
+      }
+    } else {
+      setFilteredTopics([]); // Jika tidak ada konselor dipilih atau belum ada topik
+      setSelectedTopik(''); // Reset selectedTopik
+    }
+  }, [selectedKonselor, allTopics, konselors, selectedTopik]); // Tambahkan selectedTopik ke dependencies
 
   const handleRequestSesi = async (e: FormEvent) => {
     e.preventDefault();
@@ -156,11 +181,11 @@ export default function MahasiswaPanel() {
               <p className="text-gray-500">Tidak ada konselor yang tersedia.</p>
             )}
             <h3 className="text-xl font-semibold text-gray-700 mt-6 mb-3">
-              Topik Konseling
+              Topik Konseling (berdasarkan Konselor Terpilih di Modal)
             </h3>
-            {topics.length > 0 ? (
+            {filteredTopics.length > 0 ? ( // Menampilkan filteredTopics di sini
               <ul className="space-y-2">
-                {topics.map((topik) => (
+                {filteredTopics.map((topik) => (
                   <li
                     key={topik.topik_id}
                     className="bg-gray-50 p-3 rounded-md shadow-sm"
@@ -172,7 +197,9 @@ export default function MahasiswaPanel() {
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-500">Tidak ada topik yang tersedia.</p>
+              <p className="text-gray-500">
+                Pilih konselor di modal untuk melihat topik yang tersedia, atau konselor terpilih tidak memiliki topik.
+              </p>
             )}
           </div>
         </div>
@@ -248,17 +275,7 @@ export default function MahasiswaPanel() {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">-- Pilih Konselor --</option>
-                  {konselors.map((k, index) => {
-                    // --- LOGGING DI DALAM MAP UNTUK MEMBONGKAR DATA ---
-                    // Kita hanya log untuk item pertama agar console tidak penuh
-                    if (index === 0) {
-                      console.log(
-                        "MEMERIKSA OBJEK 'k' PERTAMA DI DALAM .map():",
-                        k
-                      );
-                      console.log("--> Mencoba set 'value' ke:", k.nik);
-                    }
-                    // --- AKHIR LOGGING ---
+                  {konselors.map((k) => {
                     return (
                       <option key={k.nik} value={k.nik}>
                         {k.nama} ({k.spesialisasi})
@@ -278,12 +295,23 @@ export default function MahasiswaPanel() {
                   required
                 >
                   <option value="">-- Pilih Topik --</option>
-                  {topics.map((t) => (
+                  {filteredTopics.map((t) => ( // Gunakan filteredTopics di sini
                     <option key={t.topik_id} value={t.topik_id}>
                       {t.topik_nama}
                     </option>
                   ))}
                 </select>
+                {/* Pesan bantuan untuk pengguna */}
+                {filteredTopics.length === 0 && selectedKonselor && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Konselor ini tidak memiliki topik yang tersedia.
+                  </p>
+                )}
+                {filteredTopics.length === 0 && !selectedKonselor && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Pilih konselor terlebih dahulu untuk melihat topik.
+                  </p>
+                )}
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <button
