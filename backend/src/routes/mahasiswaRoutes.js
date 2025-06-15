@@ -22,7 +22,7 @@ router.use((req, res, next) => {
 router.get(
   '/',
   protect,
-  authorizeRoles('Admin'),
+  authorizeRoles('Admin', 'Mahasiswa'),
   getMahasiswas
 );
 

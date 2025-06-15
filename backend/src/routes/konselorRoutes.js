@@ -29,7 +29,7 @@ router.use((req, res, next) => {
 router.get(
   '/',
   protect, // Protect this route
-  authorizeRoles('Admin'), // Only Admin can get the full list of all counselors
+  authorizeRoles('Admin', 'Mahasiswa'), // Only Admin can get the full list of all counselors
   getKonselors
 );
 

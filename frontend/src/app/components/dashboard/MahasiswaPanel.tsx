@@ -117,12 +117,12 @@ export default function MahasiswaPanel() {
       console.log("Data yang akan dikirim ke backend:", {
         konselor_nik: selectedKonselor,
         topik_id: selectedTopik,
-        tanggal: selectedRequestedDate, // Kirim tanggal yang dipilih mahasiswa
+        tanggal: selectedRequestedDate,
       });
       await api.post("/sesi", {
         konselor_nik: selectedKonselor,
         topik_id: selectedTopik,
-        tanggal: selectedRequestedDate, // Gunakan tanggal yang dipilih
+        tanggal: selectedRequestedDate,
       });
       setModalMessage("Permintaan sesi berhasil diajukan!");
       setModalMessageType("success");

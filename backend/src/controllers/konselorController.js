@@ -15,9 +15,8 @@ const generateCharId = () => {
 
 // Mendapatkan semua konselor beserta topiknya
 const getKonselors = async (req, res) => {
+    const { userId, spesialisasi } = req.query; // Dapatkan parameter spesialisasi juga
     try {
-        // Jika ada query param userId, filter berdasarkan itu
-        const { userId } = req.query;
         let query = `
             SELECT
                 k.NIK,
@@ -25,29 +24,40 @@ const getKonselors = async (req, res) => {
                 k.spesialisasi,
                 k.kontak,
                 u.username,
-                ARRAY_AGG(t.topik_nama)
+                -- Perubahan KUNCI di sini: COALESCE untuk memastikan selalu array
+                COALESCE(ARRAY_AGG(t.topik_nama) FILTER (WHERE t.topik_nama IS NOT NULL), '{}') AS topik_nama
             FROM Konselor k
             JOIN "User" u ON k.User_user_id = u.user_id
             LEFT JOIN Konselor_Topik kt ON k.NIK = kt.Konselor_NIK
             LEFT JOIN Topik t ON kt.Topik_topik_id = t.topik_id
         `;
         const params = [];
+        const whereClauses = [];
+        let paramIndex = 1;
 
         if (userId) {
-            query += ` WHERE u.user_id = $1`;
+            whereClauses.push(`u.user_id = $${paramIndex++}`);
             params.push(userId);
+        }
+        if (spesialisasi) {
+            whereClauses.push(`k.spesialisasi ILIKE $${paramIndex++}`);
+            params.push(`%${spesialisasi}%`);
+        }
+
+        if (whereClauses.length > 0) {
+            query += ` WHERE ` + whereClauses.join(' AND ');
         }
 
         query += ` GROUP BY k.NIK, k.nama, k.spesialisasi, k.kontak, u.username ORDER BY k.nama;`;
 
-        console.log("Executing getKonselors query:", query, "with params:", params); // Tambahkan log ini
+        console.log("Executing getKonselors query:", query, "with params:", params);
         const result = await db.query(query, params);
-        console.log("Konselors data fetched:", result.rows); // Tambahkan log ini
+        console.log("Konselors data fetched (DEBUG):", JSON.stringify(result.rows, null, 2)); // Debugging log lengkap
         res.json(result.rows);
 
     } catch (err) {
         console.error("Error in getKonselors:", err.message);
-        console.error("Detailed error in getKonselors:", err); // Log error lengkap
+        console.error("Detailed error in getKonselors:", err);
         res.status(500).send('Kesalahan server saat mengambil data konselor');
     }
 };
