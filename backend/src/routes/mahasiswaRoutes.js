@@ -35,7 +35,7 @@ router.get(
 
 // PUT update mahasiswa by NRP (admin atau mahasiswa itu sendiri)
 router.put(
-  '/:nrp',
+  '/:nrp', // 
   protect,
   authorizeRoles('Admin', 'Mahasiswa'),
   updateMahasiswa

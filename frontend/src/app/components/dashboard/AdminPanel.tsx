@@ -249,6 +249,7 @@ export default function AdminPanel() {
     setFormValues((prev) => ({ ...prev, [name]: value }));
   };
 
+  // new
   const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -264,105 +265,66 @@ export default function AdminPanel() {
           await api.post("/topiks", { topik_nama: formValues.topik_nama });
           setMessage("Topik berhasil ditambahkan!");
         }
-      } else if (modalType === "edit") {
-        if (activeTab === "users" && currentItem && "user_id" in currentItem) {
-          await api.put(`/users/${currentItem.user_id}`, {
-            username: formValues.username,
-            role: formValues.role,
-          });
-          setMessage("Pengguna berhasil diperbarui!");
-        } else if (
-          activeTab === "admin" &&
-          currentItem &&
-          "admin_id" in currentItem
-        ) {
-          await api.put(`/admins/${currentItem.admin_id}`, {
-            nama: formValues.nama,
-          });
-          setMessage("Admin berhasil diperbarui!");
-        } else if (
-          activeTab === "mahasiswa" &&
-          currentItem &&
-          "NRP" in currentItem
-        ) {
-          await api.put(`/mahasiswas/${currentItem.NRP}`, {
+      } else if (modalType === "edit" && currentItem) {
+        if ("nrp" in currentItem) {
+          await api.put(`/mahasiswas/${currentItem.nrp}`, {
             nama: formValues.nama,
             departemen: formValues.departemen,
             kontak: formValues.kontak,
           });
           setMessage("Mahasiswa berhasil diperbarui!");
-        } else if (
-          activeTab === "konselor" &&
-          currentItem &&
-          "NIK" in currentItem
-        ) {
-          await api.put(`/konselors/${currentItem.NIK}`, {
+        } else if ("nik" in currentItem) {
+          await api.put(`/konselors/${currentItem.nik}`, {
             nama: formValues.nama,
             spesialisasi: formValues.spesialisasi,
             kontak: formValues.kontak,
           });
           setMessage("Konselor berhasil diperbarui!");
-        } else if (
-          activeTab === "topik" &&
-          currentItem &&
-          "topik_id" in currentItem
-        ) {
+        } else if ("user_id" in currentItem) {
+          await api.put(`/users/${currentItem.user_id}`, {
+            username: formValues.username,
+            role: formValues.role,
+          });
+          setMessage("Pengguna berhasil diperbarui!");
+        } else if ("admin_id" in currentItem) {
+          await api.put(`/admins/${currentItem.admin_id}`, {
+            nama: formValues.nama,
+          });
+          setMessage("Admin berhasil diperbarui!");
+        } else if ("topik_id" in currentItem) {
           await api.put(`/topiks/${currentItem.topik_id}`, {
             topik_nama: formValues.topik_nama,
           });
           setMessage("Topik berhasil diperbarui!");
-        } else if (
-          activeTab === "session" &&
-          currentItem &&
-          "sesi_id" in currentItem
-        ) {
+        } else if ("sesi_id" in currentItem) {
           await api.put(`/sesi/${currentItem.sesi_id}`, {
             status: formValues.status,
             catatan: formValues.catatan,
           });
           setMessage("Sesi berhasil diperbarui!");
         }
-      } else if (modalType === "delete") {
-        if (activeTab === "users" && currentItem && "user_id" in currentItem) {
+      } else if (modalType === "delete" && currentItem) {
+        if ("nrp" in currentItem) {
+          await api.delete(`/mahasiswas/${currentItem.nrp}`);
+          setMessage("Mahasiswa berhasil dihapus!");
+        } else if ("nik" in currentItem) {
+          await api.delete(`/konselors/${currentItem.nik}`);
+          setMessage("Konselor berhasil dihapus!");
+        } else if ("user_id" in currentItem) {
           await api.delete(`/users/${currentItem.user_id}`);
           setMessage("Pengguna berhasil dihapus!");
-        } else if (
-          activeTab === "admin" &&
-          currentItem &&
-          "admin_id" in currentItem
-        ) {
-          await api.delete(`/admin/${currentItem.admin_id}`);
+        } else if ("admin_id" in currentItem) {
+          await api.delete(`/admins/${currentItem.admin_id}`);
           setMessage("Admin berhasil dihapus!");
-        } else if (
-          activeTab === "mahasiswa" &&
-          currentItem &&
-          "NRP" in currentItem
-        ) {
-          await api.delete(`/mahasiswa/${currentItem.NRP}`);
-          setMessage("Mahasiswa berhasil dihapus!");
-        } else if (
-          activeTab === "konselor" &&
-          currentItem &&
-          "NIK" in currentItem
-        ) {
-          await api.delete(`/konselor/${currentItem.NIK}`);
-          setMessage("Konselor berhasil dihapus!");
-        } else if (
-          activeTab === "topik" &&
-          currentItem &&
-          "topik_id" in currentItem
-        ) {
+        } else if ("topik_id" in currentItem) {
           await api.delete(`/topiks/${currentItem.topik_id}`);
           setMessage("Topik berhasil dihapus!");
-        } else if (
-          activeTab === "session" &&
-          currentItem &&
-          "sesi_id" in currentItem
-        ) {
+        } else if ("sesi_id" in currentItem) {
           await api.delete(`/sesi/${currentItem.sesi_id}`);
           setMessage("Sesi berhasil dihapus!");
         }
       }
+
       setMessageType("success");
       closeModal();
       fetchData(activeTab); // Refresh data setelah operasi
