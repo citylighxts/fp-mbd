@@ -191,6 +191,31 @@ const getAktivitasTerakhir = async (req, res) => {
     }
 };
 
+const getMyRekomendasi = async (req, res) => {
+    const { role, user_id } = req.user;
+
+    if (role !== 'Mahasiswa') {
+        return res.status(403).json({ message: 'Akses ditolak. Hanya mahasiswa yang dapat melihat rekomendasinya sendiri.' });
+    }
+
+    try {
+        const mhsResult = await db.query('SELECT nrp FROM Mahasiswa WHERE User_user_id = $1', [user_id]);
+        if (mhsResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Data mahasiswa tidak ditemukan.' });
+        }
+        const nrp = mhsResult.rows[0].nrp;
+
+        const rekomendasi = await getRekomendasiTopikDanKonselor(nrp);
+        if (rekomendasi.length === 0) {
+            return res.status(200).json({ message: 'Tidak ada rekomendasi yang tersedia saat ini. Selesaikan beberapa sesi untuk mendapatkan rekomendasi!', data: [] });
+        }
+        res.json(rekomendasi);
+    } catch (error) {
+        console.error('Error in getMyRekomendasi controller:', error.message);
+        res.status(500).json({ message: 'Gagal mengambil rekomendasi Anda.', error: error.message });
+    }
+};
+
 module.exports = {
     getMahasiswas,
     getMahasiswaByNRP,
@@ -199,5 +224,6 @@ module.exports = {
     deleteMahasiswa,
     ajukanSesiKonseling,
     getMahasiswaMasalahBerulang,
-    getAktivitasTerakhir
+    getAktivitasTerakhir,
+    getMyRekomendasi
 };

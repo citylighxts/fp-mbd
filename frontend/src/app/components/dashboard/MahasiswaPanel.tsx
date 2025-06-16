@@ -8,6 +8,15 @@ import MessageDisplay from "../MessageDisplay";
 import { Konselor, Topik, Sesi } from "../../types"; // Import types
 import { FaCalendarPlus, FaUserMd, FaTags, FaBookOpen } from "react-icons/fa";
 
+interface RekomendasiItem {
+  topik_id: string;
+  topik_nama: string;
+  jumlah_sesi_terkait: number;
+  konselor_rekomendasi_nik: string;
+  konselor_rekomendasi_nama: string;
+  konselor_rekomendasi_spesialisasi: string;
+}
+
 const statusLabels: { [key: string]: string } = {
   Requested: "Diminta",
   Scheduled: "Dijadwalkan",
@@ -35,6 +44,12 @@ export default function MahasiswaPanel() {
   const [selectedTopik, setSelectedTopik] = useState<string>("");
   const [selectedRequestedDate, setSelectedRequestedDate] =
     useState<string>(""); // State baru untuk tanggal permintaan
+  const [rekomendasi, setRekomendasi] = useState<RekomendasiItem[]>([]);
+  const [loadingRekomendasi, setLoadingRekomendasi] = useState(true);
+  const [pesanRekomendasi, setPesanRekomendasi] = useState("");
+  const [tipePesanRekomendasi, setTipePesanRekomendasi] = useState<
+  "success" | "error" | "info"
+  >("info");
 
   const fetchMahasiswaData = async () => {
     setLoading(true);
@@ -67,8 +82,40 @@ export default function MahasiswaPanel() {
   useEffect(() => {
     if (user && user.role === "Mahasiswa") {
       fetchMahasiswaData();
+      fetchMyRekomendasi();
     }
   }, [user]);
+
+  const fetchMyRekomendasi = async () => {
+    setLoadingRekomendasi(true);
+    setPesanRekomendasi("");
+    setTipePesanRekomendasi("info"); 
+    try {
+      // Pastikan api.get menggunakan endpoint yang benar dan mengirim token
+      const response = await api.get<RekomendasiItem[]>(
+        "/mahasiswas/rekomendasi/me"
+      );
+      setRekomendasi(response.data);
+      if (response.data.length === 0) {
+        setPesanRekomendasi(
+          "Tidak ada rekomendasi yang tersedia saat ini. Selesaikan beberapa sesi untuk mendapatkan rekomendasi!"
+        );
+        setTipePesanRekomendasi("info");
+      } else {
+        setPesanRekomendasi("Rekomendasi topik dan konselor berhasil dimuat.");
+        setTipePesanRekomendasi("success");
+      }
+    } catch (err: any) {
+      console.error("Error fetching my recommendations:", err);
+      setRekomendasi([]);
+      setPesanRekomendasi(
+        err.response?.data?.message || "Gagal memuat rekomendasi."
+      );
+      setTipePesanRekomendasi("error");
+    } finally {
+      setLoadingRekomendasi(false);
+    }
+  };
 
   // Efek untuk memfilter topik berdasarkan konselor yang dipilih
   useEffect(() => {
@@ -254,6 +301,45 @@ export default function MahasiswaPanel() {
               Anda belum memiliki sesi konseling yang terdaftar.
             </p>
           )}
+        </div>
+
+        <div className="card lg:col-span-2"> {/* Pakai lg:col-span-2 agar memenuhi lebar penuh di layar besar */}
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <FaTags /> Rekomendasi Topik dan Konselor
+            </h2>
+
+            {loadingRekomendasi ? (
+                <LoadingSpinner />
+            ) : rekomendasi.length > 0 ? (
+                <div className="overflow-x-auto mt-4">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Topik</th>
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Sesi Terkait (Anda)</th>
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Konselor Rekomendasi</th>
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Spesialisasi Konselor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rekomendasi.map((item) => (
+                                <tr key={item.topik_id + item.konselor_rekomendasi_nik} className="hover:bg-gray-50">
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.topik_nama}</td>
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.jumlah_sesi_terkait}</td>
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_rekomendasi_nama || 'Tidak Tersedia'}</td>
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_rekomendasi_spesialisasi || 'Tidak Tersedia'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <p className="text-gray-600">{pesanRekomendasi}</p>
+            )}
+            {/* Tampilkan pesan rekomendasi di luar tabel jika tidak ada data */}
+            {!loadingRekomendasi && rekomendasi.length === 0 && pesanRekomendasi && (
+                <MessageDisplay message={pesanRekomendasi} type={tipePesanRekomendasi} />
+            )}
         </div>
       </div>
 

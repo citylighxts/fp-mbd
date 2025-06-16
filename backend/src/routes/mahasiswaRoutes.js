@@ -30,6 +30,8 @@ router.get(
   mahasiswaController.getMahasiswaByTopik
 );
 
+router.get('/rekomendasi/me', protect, authorizeRoles('Mahasiswa'), mahasiswaController.getMyRekomendasi);
+
 // GET mahasiswa by NRP (admin atau mahasiswa itu sendiri)
 router.get(
   '/:nrp',
