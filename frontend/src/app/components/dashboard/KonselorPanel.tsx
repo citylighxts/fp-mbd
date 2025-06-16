@@ -37,6 +37,7 @@ export default function KonselorPanel() {
   const [sesi, setSesi] = useState<Sesi[]>([]);
   const [konselorTopiks, setKonselorTopiks] = useState<string[]>([]); // Array of topic names
   const [allTopiks, setAllTopiks] = useState<Topik[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>("Semua");
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<
@@ -340,56 +341,87 @@ export default function KonselorPanel() {
           <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <FaClipboardList /> Sesi Konseling Mendatang/Tertunda
           </h2>
+          <div className="my-4">
+            <label
+              htmlFor="statusFilter"
+              className="mr-2 font-semibold text-gray-700"
+            >
+              Filter berdasarkan Status:
+            </label>
+            <select
+              id="statusFilter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="p-2 border rounded-md shadow-sm"
+            >
+              <option value="Semua">Semua</option>
+              <option value="Requested">Diminta</option>
+              <option value="Scheduled">Dijadwalkan</option>
+              <option value="Completed">Selesai</option>
+              <option value="Cancelled">Dibatalkan</option>
+            </select>
+          </div>
           {loading && <LoadingSpinner />}
-          {sesi.length > 0 ? (
-            <div className="space-y-4">
-              {sesi.map((s) => (
-                <div
-                  key={s.sesi_id}
-                  className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200"
-                >
-                  <p className="text-lg font-semibold text-primary">
-                    Sesi ID: {s.sesi_id}
-                  </p>
-                  <p className="text-gray-700">
-                    Tanggal: {new Date(s.tanggal).toLocaleString()}
-                  </p>
-                  <p className="text-gray-700">
-                    Mahasiswa: {s.mahasiswa_nama} ({s.mahasiswa_departemen})
-                  </p>
-                  <p className="text-gray-700">Topik: {s.topik_nama}</p>
-                  <p
-                    className={`font-semibold mt-2 ${
-                      s.status === "Requested"
-                        ? "text-yellow-600"
-                        : s.status === "Scheduled"
-                        ? "text-blue-600"
-                        : s.status === "Completed"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    Status: {statusLabels[s.status] || s.status}
-                  </p>
-                  {s.catatan && (
-                    <p className="text-sm text-gray-600 mt-2 italic">
-                      Catatan: {s.catatan}
-                    </p>
-                  )}
-                  <button
-                    onClick={() => openModal("editSesi", s)}
-                    className="btn-secondary mt-3 flex items-center gap-1"
-                  >
-                    <FaEdit /> Edit Sesi
-                  </button>
+          {(() => {
+            const filteredSesi = sesi.filter(
+              (s) => statusFilter === "Semua" || s.status === statusFilter
+            );
+            if (filteredSesi.length > 0) {
+              return (
+                <div className="space-y-4">
+                  {filteredSesi.map((s) => (
+                    <div
+                      key={s.sesi_id}
+                      className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200"
+                    >
+                      <p className="text-lg font-semibold text-primary">
+                        Sesi ID: {s.sesi_id}
+                      </p>
+                      <p className="text-gray-700">
+                        Tanggal: {new Date(s.tanggal).toLocaleString()}
+                      </p>
+                      <p className="text-gray-700">
+                        Mahasiswa: {s.mahasiswa_nama} ({s.mahasiswa_departemen})
+                      </p>
+                      <p className="text-gray-700">Topik: {s.topik_nama}</p>
+                      <p
+                        className={`font-semibold mt-2 ${
+                          s.status === "Requested"
+                            ? "text-yellow-600"
+                            : s.status === "Scheduled"
+                            ? "text-blue-600"
+                            : s.status === "Completed"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        Status: {statusLabels[s.status] || s.status}
+                      </p>
+                      {s.catatan && (
+                        <p className="text-sm text-gray-600 mt-2 italic">
+                          Catatan: {s.catatan}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => openModal("editSesi", s)}
+                        className="btn-secondary mt-3 flex items-center gap-1"
+                      >
+                        <FaEdit /> Edit Sesi
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500">
-              Tidak ada sesi konseling yang terdaftar untuk Anda.
-            </p>
-          )}
+              );
+            } else {
+              return (
+                <p className="text-gray-500">
+                  {sesi.length === 0
+                    ? "Anda belum memiliki sesi konseling yang terdaftar."
+                    : `Tidak ada sesi dengan status "${statusFilter}" yang ditemukan.`}
+                </p>
+              );
+            }
+          })()}
         </div>
 
         <div className="card">
