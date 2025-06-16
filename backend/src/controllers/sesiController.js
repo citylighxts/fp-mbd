@@ -460,6 +460,27 @@ const getSessionStatusDistribution = async (req, res) => {
     }
 };
 
+const transferSesi = async (req, res) => {
+    const { sesiId, newKonselorNik } = req.body;
+
+    if (!sesiId || !newKonselorNik) {
+        return res.status(400).json({ message: 'ID Sesi dan NIK konselor baru wajib diisi.' });
+    }
+
+    try {
+        // Memanggil prosedur database
+        await db.query('CALL transfer_sesi_konselor($1, $2);', [sesiId, newKonselorNik]);
+        res.status(200).json({ message: `Sesi ${sesiId} berhasil ditransfer ke konselor ${newKonselorNik}.` });
+    } catch (err) {
+        console.error("Error transferring session:", err.message);
+        // Tangkap pesan exception dari prosedur
+        if (err.message && err.message.includes('Sesi dengan ID') || err.message.includes('Konselor baru dengan NIK') || err.message.includes('tidak memiliki keahlian') || err.message.includes('tidak dapat ditransfer')) {
+            return res.status(400).json({ message: err.message });
+        }
+        res.status(500).send('Kesalahan server saat mentransfer sesi.');
+    }
+};
+
 module.exports = {
     createSesi,
     getAllSesi,
@@ -470,5 +491,6 @@ module.exports = {
     getCompletedSessions,
     getSesiBySpesialisasi,
     initializeSesiLengkapView,
-    getSessionStatusDistribution
+    getSessionStatusDistribution,
+    transferSesi
 };

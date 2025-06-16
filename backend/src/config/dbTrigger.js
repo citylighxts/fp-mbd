@@ -84,11 +84,9 @@ const cegahJadwalMasaLalu = `
     DECLARE
         new_session_datetime TIMESTAMP;
     BEGIN
-        IF NEW.tanggal IS NOT NULL AND NEW.waktu IS NOT NULL THEN
-            new_session_datetime := (NEW.tanggal || ' ' || NEW.waktu)::TIMESTAMP;
-
-            IF new_session_datetime < NOW() THEN
-                RAISE EXCEPTION 'Sesi tidak dapat dijadwalkan di masa lalu. Tanggal dan waktu sesi harus di masa depan.';
+        IF NEW.tanggal IS NOT NULL THEN
+            IF NEW.tanggal < CURRENT_DATE THEN THEN
+                RAISE EXCEPTION 'Sesi tidak dapat dijadwalkan di masa lalu. Tanggal sesi harus di masa depan.';
             END IF;
         END IF;
 

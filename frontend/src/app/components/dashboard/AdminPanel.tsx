@@ -16,6 +16,7 @@ import {
   FaPlus,
   FaCheck,
   FaListAlt,
+  FaExchangeAlt,
 } from "react-icons/fa";
 import { User, Admin, Mahasiswa, Konselor, Topik, Sesi } from "../../types"; // Import types
 
@@ -135,6 +136,13 @@ export default function AdminPanel() {
   const [sessionStatusDistribution, setSessionStatusDistribution] = useState<SessionStatusDistribution[]>([]);
   const [loadingSessionStatusDistribution, setLoadingSessionStatusDistribution] = useState<boolean>(false);
   const [sessionStatusDistributionMessage, setSessionStatusDistributionMessage] = useState<string>('');
+
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState<boolean>(false);
+  const [sesiToTransfer, setSesiToTransfer] = useState<Sesi | null>(null);
+  const [newKonselorNik, setNewKonselorNik] = useState<string>('');
+  const [transferModalMessage, setTransferModalMessage] = useState<string>('');
+  const [transferModalMessageType, setTransferModalMessageType] = useState<"success" | "error" | "info" | "">('');
+  const [allKonselorsForTransfer, setAllKonselorsForTransfer] = useState<Konselor[]>([]); // Untuk dropdown konselor di modal transfer
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">(
@@ -522,6 +530,31 @@ export default function AdminPanel() {
     setMessageType("info");
   };
 
+  const openTransferModal = (sesi: Sesi) => {
+    setSesiToTransfer(sesi);
+    setIsTransferModalOpen(true);
+    setNewKonselorNik(''); // Reset
+    setTransferModalMessage(''); // Reset
+    setTransferModalMessageType(''); // Reset
+    // Fetch all konselors for the dropdown
+    api.get<Konselor[]>('/konselors') // Pastikan endpoint ini mengembalikan semua konselor
+        .then(res => setAllKonselorsForTransfer(res.data))
+        .catch(err => {
+            console.error("Error fetching konselors for transfer modal:", err);
+            setTransferModalMessage("Gagal memuat daftar konselor.");
+            setTransferModalMessageType("error");
+        });
+  };
+
+  const closeTransferModal = () => {
+      setIsTransferModalOpen(false);
+      setSesiToTransfer(null);
+      setNewKonselorNik('');
+      setTransferModalMessage('');
+      setTransferModalMessageType('');
+      setAllKonselorsForTransfer([]);
+  };
+
   const handleFormChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -614,6 +647,42 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTransferSesi = async (e: FormEvent) => {
+      e.preventDefault();
+      if (!sesiToTransfer || !newKonselorNik) {
+          setTransferModalMessage("Pilih sesi dan konselor baru.");
+          setTransferModalMessageType("error");
+          return;
+      }
+
+      if (sesiToTransfer.konselor_nik === newKonselorNik) {
+          setTransferModalMessage("Konselor baru tidak boleh sama dengan konselor saat ini.");
+          setTransferModalMessageType("error");
+          return;
+      }
+
+      setLoading(true); // Gunakan loading global atau buat loading terpisah untuk modal ini
+      setTransferModalMessage('');
+      setTransferModalMessageType('');
+
+      try {
+          await api.post('/sesi/transfer', {
+              sesiId: sesiToTransfer.sesi_id,
+              newKonselorNik: newKonselorNik
+          });
+          setTransferModalMessage(`Sesi ${sesiToTransfer.sesi_id} berhasil ditransfer.`);
+          setTransferModalMessageType("success");
+          closeTransferModal(); // Tutup modal setelah berhasil
+          fetchData("session"); // Refresh data sesi di tabel utama
+      } catch (error: any) {
+          console.error("Error transferring session:", error);
+          setTransferModalMessage(error.response?.data?.message || "Gagal mentransfer sesi.");
+          setTransferModalMessageType("error");
+      } finally {
+          setLoading(false);
+      }
   };
 
   const renderModalContent = () => {
@@ -1750,6 +1819,9 @@ export default function AdminPanel() {
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
                         Catatan
                       </th>
+                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Aksi
+                      </th>
                     </>
                   )}
                   {activeTab === "session" && filteredsession.length > 0 && (
@@ -1939,18 +2011,25 @@ export default function AdminPanel() {
                       </td>
                       <td className="py-2 px-4 border-b text-center">
                         <button
-                          onClick={() => openModal("edit", item)}
-                          className="text-blue-600 hover:text-blue-800 mr-2"
+                            onClick={() => openModal("edit", item)}
+                            className="text-blue-600 hover:text-blue-800 mr-2"
                         >
-                          <FaEdit />
+                            <FaEdit />
                         </button>
                         <button
-                          onClick={() => openModal("delete", item)}
-                          className="text-red-600 hover:text-red-800"
+                            onClick={() => openTransferModal(item)}
+                            className="text-purple-600 hover:text-purple-800 mr-2"
+                            title="Transfer Sesi"
                         >
-                          <FaTrash />
+                            <FaExchangeAlt />
                         </button>
-                      </td>
+                        <button
+                            onClick={() => openModal("delete", item)} // Tombol delete yang sudah ada
+                            className="text-red-600 hover:text-red-800"
+                        >
+                            <FaTrash />
+                        </button>
+                      </td> 
                     </tr>
                   ))}
                 {activeTab === "session" &&
@@ -2052,6 +2131,57 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+
+      {isTransferModalOpen && sesiToTransfer && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+          <h3 className="text-2xl font-bold mb-4 text-primary">
+            Transfer Sesi: {sesiToTransfer.sesi_id}
+          </h3>
+          {transferModalMessage && transferModalMessageType && (
+            <MessageDisplay message={transferModalMessage} type={transferModalMessageType} />
+          )}
+          <form onSubmit={handleTransferSesi} className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Sesi ini saat ini ditangani oleh: <span className="font-semibold">{sesiToTransfer.konselor_nama}</span>
+            </p>
+            <div>
+              <label htmlFor="newKonselor">Pilih Konselor Baru:</label>
+              <select
+                id="newKonselor"
+                value={newKonselorNik}
+                onChange={(e) => setNewKonselorNik(e.target.value)}
+                required
+                className="w-full p-2 border rounded"
+              >
+                <option value="">-- Pilih Konselor --</option>
+                {allKonselorsForTransfer.map((k) => (
+                  <option key={k.nik} value={k.nik}>
+                    {k.nama} ({k.spesialisasi})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={closeTransferModal}
+                className="btn-secondary"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={loading} // Gunakan loading global atau buat loading terpisah
+              >
+                {loading ? "Mentransfer..." : "Transfer Sesi"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">

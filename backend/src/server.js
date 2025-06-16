@@ -7,7 +7,7 @@ require('dotenv').config();
 const db = require('./config/db'); // Ensure this path is correct
 const { initializeTriggers } = require('./config/dbTrigger');
 const { createViews } = require('./config/dbView');
-const { createFunctions } = require('./config/dbFunction');
+const { createFunctions, createRekapStatusFunction, createTransferSesiKonselorProcedure } = require('./config/dbFunction');
 
 // Import your route modules
 const authRoutes = require('./routes/authRoutes');
@@ -65,6 +65,8 @@ app.listen(PORT, async () => {
         await initializeTriggers();
         await createViews();
         await createFunctions();
+        await createRekapStatusFunction();
+        await createTransferSesiKonselorProcedure();
 
     } catch (error) {
         console.error('Gagal terhubung ke database atau menginisialisasi views:', error.message);

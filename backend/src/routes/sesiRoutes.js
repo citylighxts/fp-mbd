@@ -8,7 +8,8 @@
         deleteSesi,
         getCompletedSessions, // Pastikan ini diimpor
         getSesiBySpesialisasi,
-        getSessionStatusDistribution
+        getSessionStatusDistribution,
+        transferSesi
     } = require('../controllers/sesiController'); // Impor dari sesiController
     const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Impor middleware otentikasi dan otorisasi
     const router = express.Router();
@@ -44,6 +45,13 @@
     protect,
     authorizeRoles('Admin'), // Hanya admin yang bisa melihat laporan ini
     getSessionStatusDistribution
+    );
+
+    router.post(
+    '/transfer',
+    protect,
+    authorizeRoles('Admin'), // Hanya admin yang bisa mentransfer sesi
+    transferSesi
     );
 
     module.exports = router;

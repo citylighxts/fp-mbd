@@ -98,9 +98,79 @@ const getRekapStatusFunction = async () => {
     }
 }
 
+const ProcedureTransferSesiKonselor = `
+    CREATE OR REPLACE PROCEDURE transfer_sesi_konselor(
+        p_sesi_id VARCHAR(255),
+        p_konselor_nik_baru VARCHAR(255)
+    )
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        current_konselor_nik VARCHAR(255);
+        sesi_status TEXT;
+        topik_sesi_id VARCHAR(255);
+        mahasiswa_sesi_nrp VARCHAR(255);
+        konselor_baru_ada BOOLEAN;
+        keahlian_sesuai BOOLEAN;
+        original_tanggal DATE;
+    BEGIN
+        SELECT Konselor_NIK, status, Topik_topik_id, Mahasiswa_NRP, tanggal
+        INTO current_konselor_nik, sesi_status, topik_sesi_id, mahasiswa_sesi_nrp, original_tanggal
+        FROM Sesi
+        WHERE sesi_id = p_sesi_id;
+
+        IF current_konselor_nik IS NULL THEN
+            RAISE EXCEPTION 'Sesi dengan ID %s tidak ditemukan.', p_sesi_id;
+        END IF;
+
+        SELECT EXISTS (SELECT 1 FROM Konselor WHERE NIK = p_konselor_nik_baru)
+        INTO konselor_baru_ada;
+
+        IF NOT konselor_baru_ada THEN
+            RAISE EXCEPTION 'Konselor baru dengan NIK %s tidak ditemukan.', p_konselor_nik_baru;
+        END IF;
+
+        SELECT EXISTS (
+            SELECT 1 FROM Konselor_Topik
+            WHERE Konselor_NIK = p_konselor_nik_baru
+            AND Topik_topik_id = topik_sesi_id
+        ) INTO keahlian_sesuai;
+
+        IF NOT keahlian_sesuai THEN
+            RAISE EXCEPTION 'Konselor baru dengan NIK %s tidak memiliki keahlian untuk topik sesi ini.', p_konselor_nik_baru;
+        END IF;
+
+        IF sesi_status IN ('Completed', 'Cancelled') THEN
+            RAISE EXCEPTION 'Sesi dengan ID %s tidak dapat ditransfer karena statusnya sudah %s.', p_sesi_id, sesi_status;
+        END IF;
+
+        UPDATE Sesi
+        SET
+            Konselor_NIK = p_konselor_nik_baru,
+            tanggal = original_tanggal,
+            catatan = COALESCE(catatan, '') || E'\n-- Ditransfer dari ' || current_konselor_nik || ' ke ' || p_konselor_nik_baru || ' pada ' || NOW() || ' --'
+        WHERE sesi_id = p_sesi_id;
+
+        RAISE NOTICE 'Sesi %s berhasil ditransfer dari %s ke %s.', p_sesi_id, current_konselor_nik, p_konselor_nik_baru;
+    END;
+    $$;
+`;
+
+const createTransferSesiKonselorProcedure = async () => {
+    try {
+        console.log('Creating transfer session procedure...');
+        await db.query(ProcedureTransferSesiKonselor);
+        console.log('Procedure transfer_sesi_konselor created/updated successfully.');
+    } catch (err) {
+        console.error('Error creating transfer session procedure:', err.message);
+        throw err;
+    }
+};
+
 module.exports = {
     createFunctions,
     getLaporanBulanan,
     createRekapStatusFunction,
-    getRekapStatusFunction
+    getRekapStatusFunction,
+    createTransferSesiKonselorProcedure
 };
