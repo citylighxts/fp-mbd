@@ -1,5 +1,7 @@
 const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const { getLaporanBulanan } = require('../config/dbFunction');
+const { get } = require('../routes/authRoutes');
 
 // Menambah admin baru dengan admin_id urut (A001, A002, dst, tanpa loncatan)
 const tambahAdmin = async (req, res) => {
@@ -239,7 +241,25 @@ const getSesiSelesaiKonselor = async (req, res) => {
     res.json(result.rows);
 };
 
+const getLaporanSesiBulanan = async (req, res) => {
+    const { bulan, tahun } = req.query;
 
+    if (!bulan || !tahun) {
+        return res.status(400).json({ message: 'Parameter bulan dan tahun wajib diisi.' });
+    }
+
+    try {
+        const laporan = await getLaporanBulanan(parseInt(bulan, 10), parseInt(tahun, 10));
+        if (laporan) {
+            res.json(laporan);
+        } else {
+            res.status(404).json({ message: 'Tidak ada data laporan untuk bulan dan tahun yang ditentukan.' });
+        }
+    } catch (error) {
+        console.error('Error in getLaporanSesiBulanan controller:', error.message);
+        res.status(500).json({ message: 'Gagal mengambil laporan sesi bulanan.', error: error.message });
+    }
+};
 
 module.exports = {
     tambahAdmin,
@@ -249,5 +269,6 @@ module.exports = {
     deleteAdmin,
     deleteMahasiswa, 
     deleteKonselor,
-    getSesiSelesaiKonselor
+    getSesiSelesaiKonselor,
+    getLaporanSesiBulanan
 };

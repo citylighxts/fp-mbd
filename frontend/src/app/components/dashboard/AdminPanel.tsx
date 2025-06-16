@@ -70,6 +70,13 @@ interface KonselorSessionSummary {
   total_sesi_aktif_pending: number;
 }
 
+interface LaporanSesiBulanan {
+  total_sesi: number;
+  sesi_selesai: number;
+  sesi_dibatalkan: number;
+  topik_paling_populer: string | null;
+}
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<keyof AdminDataState>("users"); // Tipe tab aktif
@@ -130,6 +137,16 @@ export default function AdminPanel() {
   const [currentItem, setCurrentItem] = useState<
     User | Admin | Mahasiswa | Konselor | Topik | Sesi | null
   >(null);
+
+  const [bulanLaporan, setBulanLaporan] = useState(new Date().getMonth() + 1); // Bulan saat ini
+  const [tahunLaporan, setTahunLaporan] = useState(new Date().getFullYear()); // Tahun saat ini
+  const [laporanBulanan, setLaporanBulanan] =
+    useState<LaporanSesiBulanan | null>(null);
+  const [loadingLaporanBulanan, setLoadingLaporanBulanan] = useState(false);
+  const [pesanLaporanBulanan, setPesanLaporanBulanan] = useState("");
+  const [tipePesanLaporanBulanan, setTipePesanLaporanBulanan] = useState<
+    "success" | "error" | "info"
+  >("info");
 
   const [formValues, setFormValues] = useState<FormValues>({
     username: "",
@@ -375,6 +392,57 @@ export default function AdminPanel() {
       setMessageType("error");
     } finally {
       setLoadingSelesai(false);
+    }
+  };
+
+  const fetchLaporanSesiBulanan = async () => {
+    if (!bulanLaporan || !tahunLaporan) {
+      setPesanLaporanBulanan("Pilih bulan dan tahun untuk laporan.");
+      setTipePesanLaporanBulanan("error");
+      return;
+    }
+    setLoadingLaporanBulanan(true);
+    setPesanLaporanBulanan("");
+    setLaporanBulanan(null);
+    setTipePesanLaporanBulanan("info");
+
+    try {
+      const response = await api.get<LaporanSesiBulanan>(`/admins/laporan`, {
+        params: {
+          bulan: bulanLaporan,
+          tahun: tahunLaporan,
+        },
+      });
+      setLaporanBulanan(response.data);
+      if (response.data.total_sesi === 0) {
+        setPesanLaporanBulanan(
+          `Tidak ada sesi ditemukan untuk ${new Date(
+            tahunLaporan,
+            bulanLaporan - 1
+          ).toLocaleString("id-ID", { month: "long", year: "numeric" })}.`
+        );
+        setTipePesanLaporanBulanan("info");
+      } else {
+        setPesanLaporanBulanan(
+          `Laporan sesi bulanan untuk ${new Date(
+            tahunLaporan,
+            bulanLaporan - 1
+          ).toLocaleString("id-ID", {
+            month: "long",
+            year: "numeric",
+          })} berhasil dimuat.`
+        );
+        setTipePesanLaporanBulanan("success");
+      }
+    } catch (err: any) {
+      console.error("Error fetching monthly session report:", err);
+      setLaporanBulanan(null);
+      setPesanLaporanBulanan(
+        err.response?.data?.message || "Gagal memuat laporan sesi bulanan."
+      );
+      setTipePesanLaporanBulanan("error");
+    } finally {
+      setLoadingLaporanBulanan(false);
     }
   };
 
@@ -1377,6 +1445,114 @@ export default function AdminPanel() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold mb-2">
+                Laporan Sesi Bulanan
+              </h3>
+              <div className="flex flex-col md:flex-row gap-2 md:items-baseline">
+                <div>
+                  <label
+                    htmlFor="bulanLaporan"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Bulan:
+                  </label>
+                  <select
+                    id="bulanLaporan"
+                    value={bulanLaporan}
+                    onChange={(e) =>
+                      setBulanLaporan(parseInt(e.target.value, 10))
+                    }
+                    className="border rounded px-2 py-1"
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {new Date(0, i).toLocaleString("id-ID", {
+                          month: "long",
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="tahunLaporan"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Tahun:
+                  </label>
+                  <input
+                    type="number"
+                    id="tahunLaporan"
+                    value={tahunLaporan}
+                    onChange={(e) =>
+                      setTahunLaporan(parseInt(e.target.value, 10))
+                    }
+                    className="border rounded px-2 py-1 w-24"
+                    min="2000" // Batasan tahun minimal
+                    max={new Date().getFullYear() + 1} // Batasan tahun maksimal (misal, tahun depan)
+                  />
+                </div>
+                <button
+                  className="btn-primary mt-2 md:mt-0"
+                  onClick={fetchLaporanSesiBulanan}
+                  disabled={loadingLaporanBulanan}
+                >
+                  {loadingLaporanBulanan
+                    ? "Memuat Laporan..."
+                    : "Tampilkan Laporan Bulanan"}
+                </button>
+                {(laporanBulanan || pesanLaporanBulanan) && (
+                  <button
+                    className="btn-secondary ml-2"
+                    onClick={() => {
+                      setLaporanBulanan(null);
+                      setPesanLaporanBulanan("");
+                      setTipePesanLaporanBulanan("info");
+                      setBulanLaporan(new Date().getMonth() + 1);
+                      setTahunLaporan(new Date().getFullYear());
+                    }}
+                  >
+                    Reset Laporan
+                  </button>
+                )}
+              </div>
+
+              {pesanLaporanBulanan && (
+                <MessageDisplay
+                  message={pesanLaporanBulanan}
+                  type={tipePesanLaporanBulanan}
+                />
+              )}
+
+              {!loadingLaporanBulanan && laporanBulanan && (
+                <div className="bg-white shadow rounded-lg p-4 mt-4">
+                  <h4 className="text-md font-semibold mb-2 text-gray-700">
+                    Ringkasan Laporan Bulan{" "}
+                    {new Date(tahunLaporan, bulanLaporan - 1).toLocaleString(
+                      "id-ID",
+                      { month: "long", year: "numeric" }
+                    )}
+                  </h4>
+                  <p>
+                    <strong>Total Sesi:</strong> {laporanBulanan.total_sesi}
+                  </p>
+                  <p>
+                    <strong>Sesi Selesai:</strong> {laporanBulanan.sesi_selesai}
+                  </p>
+                  <p>
+                    <strong>Sesi Dibatalkan:</strong>{" "}
+                    {laporanBulanan.sesi_dibatalkan}
+                  </p>
+                  <p>
+                    <strong>Topik Paling Populer:</strong>{" "}
+                    {laporanBulanan.topik_paling_populer ||
+                      "Tidak ada data topik"}
+                  </p>
                 </div>
               )}
             </div>
