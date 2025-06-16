@@ -73,7 +73,7 @@ const cegahHapusTopik = `
     END;
     $$ LANGUAGE plpgsql;
 
-
+    DROP TRIGGER IF EXISTS tg_cegah_hapus_topik_konselor ON Topik; 
     CREATE TRIGGER tg_cegah_hapus_topik_konselor
     BEFORE DELETE ON Topik
     FOR EACH ROW
@@ -96,6 +96,7 @@ const cegahJadwalMasaLalu = `
     END;
     $$ LANGUAGE plpgsql;
 
+    DROP TRIGGER IF EXISTS tg_prevent_past_session ON Sesi;
     CREATE TRIGGER tg_prevent_past_session
     BEFORE INSERT OR UPDATE ON Sesi
     FOR EACH ROW
