@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid'); // Make sure you have uuid installed if using for session_id
+const { getRekomendasiTopikDanKonselor } = require('../config/dbFunction');
 
 // --- Get All Students ---
 const getMahasiswas = async (req, res) => {

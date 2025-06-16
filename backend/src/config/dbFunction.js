@@ -58,12 +58,12 @@ const FunctionGetRekomendasiTopikDanKonselor = `
             FROM
                 Sesi s
             WHERE
-                s.Mahasiswa_NRP = p_nrp AND s.status = 'Selesai'
+                s.mahasiswa_nrp = '5025231148' AND s.status = 'Completed'
             GROUP BY
                 s.Topik_topik_id
             ORDER BY
                 COUNT(s.sesi_id) DESC
-            LIMIT 3 -- Ambil 3 topik teratas yang sering diulang mahasiswa
+            LIMIT 3 
         ),
         KonselorAhliPerTopik AS (
             -- Temukan konselor terbaik untuk setiap topik yang sering diulang
