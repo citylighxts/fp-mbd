@@ -163,7 +163,10 @@ const createSesi = async (req, res) => {
             console.error(`Error creating sesi with sesi_id ${sesi_id}:`, err.message);
             console.error('Detailed Sesi creation error:', err);
 
-            if (err.code === '23505' && err.constraint === 'sesi_pkey') {
+            if (err.message.includes('Jadwal bentrok!')) {
+                return res.status(409).json({ message: 'Gagal: Jadwal konselor pada waktu tersebut sudah terisi.' });
+            }
+            else if (err.code === '23505' && err.constraint === 'sesi_pkey') {
                 console.warn(`Duplicate sesi_id ${sesi_id} detected. Retrying...`);
                 currentRetry++;
                 await new Promise(resolve => setTimeout(resolve, 50 + currentRetry * 20));

@@ -33,6 +33,31 @@ const createKonselorTriggerSQL = `
     EXECUTE FUNCTION fn_kapitalisasi_nama();
 `;
 
+const createJadwalBentrokFunctionSQL = `
+    CREATE OR REPLACE FUNCTION cek_jadwal_bentrok_konselor()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM sesi
+            WHERE konselor_nik = NEW.konselor_nik
+            AND tanggal = NEW.tanggal
+            AND sesi_id <> NEW.sesi_id
+        ) THEN
+            RAISE EXCEPTION 'Jadwal bentrok! Konselor sudah memiliki sesi lain pada waktu yang sama.';
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+`;
+
+const createJadwalBentrokTriggerSQL = `
+    DROP TRIGGER IF EXISTS tg_cek_jadwal_bentrok_konselor ON sesi;
+    CREATE TRIGGER tg_cek_jadwal_bentrok_konselor
+    BEFORE INSERT OR UPDATE ON sesi
+    FOR EACH ROW
+    EXECUTE FUNCTION cek_jadwal_bentrok_konselor();
+`;
+
 const initializeTriggers = async () => {
     const client = await db.pool.connect();
     try {
@@ -54,6 +79,14 @@ const initializeTriggers = async () => {
         await client.query('DROP TRIGGER IF EXISTS tg_kapitalisasi_nama_konselor ON Konselor;');
         await client.query(createKonselorTriggerSQL);
         console.log('Trigger untuk Konselor berhasil dibuat.');
+
+        console.log('Mencoba membuat fungsi "cek_jadwal_bentrok_konselor"...');
+        await client.query(createJadwalBentrokFunctionSQL);
+        console.log('Fungsi cek jadwal berhasil dibuat.');
+
+        console.log('Mencoba membuat trigger untuk cek jadwal bentrok...');
+        await client.query(createJadwalBentrokTriggerSQL);
+        console.log('Trigger cek jadwal bentrok berhasil dibuat.');
         
         console.log('Semua trigger berhasil diinisialisasi.');
     } catch (error) {
