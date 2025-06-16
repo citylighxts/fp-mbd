@@ -77,6 +77,12 @@ interface LaporanSesiBulanan {
   topik_paling_populer: string | null;
 }
 
+interface SessionStatusDistribution {
+  status_sesi: string;
+  jumlah_sesi: number;
+  persentase_dari_total: number;
+}
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<keyof AdminDataState>("users"); // Tipe tab aktif
@@ -125,6 +131,10 @@ export default function AdminPanel() {
   const [sesiSelesai, setSesiSelesai] = useState<CompletedSesi[]>([]);
   const [loadingSelesai, setLoadingSelesai] = useState(false);
   const [pesanSelesai, setPesanSelesai] = useState("");
+
+  const [sessionStatusDistribution, setSessionStatusDistribution] = useState<SessionStatusDistribution[]>([]);
+  const [loadingSessionStatusDistribution, setLoadingSessionStatusDistribution] = useState<boolean>(false);
+  const [sessionStatusDistributionMessage, setSessionStatusDistributionMessage] = useState<string>('');
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">(
@@ -445,6 +455,30 @@ export default function AdminPanel() {
       setLoadingLaporanBulanan(false);
     }
   };
+
+  const fetchSessionStatusDistribution = async () => {
+    setLoadingSessionStatusDistribution(true);
+    setSessionStatusDistributionMessage('');
+    setMessageType('info'); // Reset message type
+
+    try {
+        const response = await api.get<SessionStatusDistribution[]>('/sesi/status-distribution');
+        setSessionStatusDistribution(response.data);
+        if (response.data.length === 0) {
+            setSessionStatusDistributionMessage('Tidak ada data sesi untuk menampilkan distribusi status.');
+        } else {
+            setSessionStatusDistributionMessage('Distribusi status sesi berhasil dimuat.');
+        }
+        setMessageType('success');
+    } catch (error: any) {
+        console.error("Error fetching session status distribution:", error);
+        setSessionStatusDistribution([]);
+        setSessionStatusDistributionMessage(error.response?.data?.message || 'Gagal memuat distribusi sesi berdasarkan status.');
+        setMessageType('error');
+    } finally {
+        setLoadingSessionStatusDistribution(false);
+    }
+};
 
   const openModal = (type: "add" | "edit" | "delete", item: any = null) => {
     setModalType(type);
@@ -1555,6 +1589,57 @@ export default function AdminPanel() {
                   </p>
                 </div>
               )}
+            </div>
+
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+            <h3 className="text-lg font-semibold mb-2">Distribusi Sesi Berdasarkan Status</h3>
+            <button
+                className="btn-primary mt-2 md:mt-0"
+                onClick={fetchSessionStatusDistribution}
+                disabled={loadingSessionStatusDistribution}
+            >
+                {loadingSessionStatusDistribution ? "Memuat..." : "Tampilkan Distribusi Status"}
+            </button>
+            {(sessionStatusDistribution.length > 0 || sessionStatusDistributionMessage) && (
+                <button
+                    className="btn-secondary ml-2"
+                    onClick={() => {
+                        setSessionStatusDistribution([]);
+                        setSessionStatusDistributionMessage('');
+                        setMessageType('info');
+                    }}
+                >
+                    Reset Laporan
+                </button>
+            )}
+            {sessionStatusDistributionMessage && (
+                <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                    {sessionStatusDistributionMessage}
+                </div>
+            )}
+            {!loadingSessionStatusDistribution && sessionStatusDistribution.length > 0 && (
+                <div className="overflow-x-auto mt-4">
+                    <h4 className="text-md font-semibold mb-2">Hasil Distribusi Status</h4>
+                    <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Status Sesi</th>
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Jumlah Sesi</th>
+                                <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Persentase Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sessionStatusDistribution.map((item) => (
+                                <tr key={item.status_sesi} className="hover:bg-gray-50">
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.status_sesi}</td>
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.jumlah_sesi}</td>
+                                    <td className="py-2 px-4 border-b text-sm text-gray-800">{item.persentase_dari_total}%</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
             </div>
           </>
         )}

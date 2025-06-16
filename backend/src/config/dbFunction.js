@@ -49,8 +49,58 @@ const getLaporanBulanan = async (bulan, tahun) => {
     }
 };
 
+const FunctionRekapStatus = `
+    CREATE OR REPLACE FUNCTION get_session_status_distribution()
+    RETURNS TABLE (
+        status_sesi TEXT,
+        jumlah_sesi BIGINT,
+        persentase_dari_total NUMERIC(5,2)
+    ) AS $$
+    DECLARE
+        total_all_sessions BIGINT;
+    BEGIN
+        SELECT COUNT(sesi_id) INTO total_all_sessions FROM Sesi;
+
+        IF total_all_sessions > 0 THEN
+            RETURN QUERY
+            SELECT
+                s.status AS status_sesi,
+                COUNT(s.sesi_id) AS jumlah_sesi,
+                (COUNT(s.sesi_id)::NUMERIC * 100 / total_all_sessions)::NUMERIC(5,2) AS persentase_dari_total
+            FROM Sesi s
+            GROUP BY s.status
+            ORDER BY jumlah_sesi DESC;
+        ELSE
+            RETURN;
+        END IF;
+    END;
+    $$ LANGUAGE plpgsql;
+`;
+
+const createRekapStatusFunction = async () => {
+    try {
+        console.log('Creating session status distribution function...');
+        await db.query(FunctionRekapStatus);
+        console.log('Function get_session_status_distribution created/updated successfully.');
+    } catch (err) {
+        console.error('Error creating session status distribution function:', err.message);
+        throw err;
+    }
+};
+
+const getRekapStatusFunction = async () => {
+    try {
+        const result = await db.query('SELECT * FROM get_session_status_distribution()');
+        return result.rows;
+    } catch (error) {
+        console.error('Error calling get_session_status_distribution:', error.message);
+        throw error;
+    }
+}
 
 module.exports = {
     createFunctions,
-    getLaporanBulanan
+    getLaporanBulanan,
+    createRekapStatusFunction,
+    getRekapStatusFunction
 };

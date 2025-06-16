@@ -7,7 +7,8 @@
         updateSesi,
         deleteSesi,
         getCompletedSessions, // Pastikan ini diimpor
-        getSesiBySpesialisasi   // Pastikan ini diimpor
+        getSesiBySpesialisasi,
+        getSessionStatusDistribution
     } = require('../controllers/sesiController'); // Impor dari sesiController
     const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Impor middleware otentikasi dan otorisasi
     const router = express.Router();
@@ -38,6 +39,12 @@
     // Hanya Admin yang bisa mengakses rute ini (sesuai spesifikasi fungsi yang ada di controller)
     router.get('/spesialisasi', protect, authorizeRoles('Admin'), getSesiBySpesialisasi);
 
+    router.get(
+    '/status-distribution', // Contoh: /api/sesi/status-distribution
+    protect,
+    authorizeRoles('Admin'), // Hanya admin yang bisa melihat laporan ini
+    getSessionStatusDistribution
+    );
 
     module.exports = router;
     

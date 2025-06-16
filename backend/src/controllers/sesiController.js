@@ -448,6 +448,18 @@ const getSesiBySpesialisasi = async (req, res) => {
     }
 };
 
+const getSessionStatusDistribution = async (req, res) => {
+    try {
+        const result = await db.query(
+            'SELECT * FROM get_session_status_distribution();'
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Error fetching session status distribution:", err.message);
+        res.status(500).send('Kesalahan server saat mengambil distribusi sesi berdasarkan status.');
+    }
+};
+
 module.exports = {
     createSesi,
     getAllSesi,
@@ -457,5 +469,6 @@ module.exports = {
     deleteSesi,
     getCompletedSessions,
     getSesiBySpesialisasi,
-    initializeSesiLengkapView // Export the new function
+    initializeSesiLengkapView,
+    getSessionStatusDistribution
 };
