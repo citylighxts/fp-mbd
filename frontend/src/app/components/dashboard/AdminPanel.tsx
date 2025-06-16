@@ -28,7 +28,7 @@ type AdminDataState = {
   konselor: Konselor[];
   topik: Topik[];
   session: Sesi[];
-  Aktifitas: any[];
+  Aktivitas: any[];
 };
 
 // Definisikan tipe untuk formValues
@@ -84,6 +84,13 @@ interface SessionStatusDistribution {
   persentase_dari_total: number;
 }
 
+interface MahasiswaMasalahBerulang {
+    nrp: string;
+    nama_mahasiswa: string;
+    topik_nama: string;
+    jumlah_sesi_dengan_topik: number;
+}
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<keyof AdminDataState>("users"); // Tipe tab aktif
@@ -94,7 +101,7 @@ export default function AdminPanel() {
     konselor: [],
     topik: [],
     session: [],
-    Aktifitas: [],
+    Aktivitas: [],
   });
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -166,6 +173,11 @@ export default function AdminPanel() {
     "success" | "error" | "info"
   >("info");
 
+  const [mahasiswaMasalahBerulang, setMahasiswaMasalahBerulang] = useState<MahasiswaMasalahBerulang[]>([]);
+  const [loadingMasalahBerulang, setLoadingMasalahBerulang] = useState(false);
+  const [pesanMasalahBerulang, setPesanMasalahBerulang] = useState('');
+  const [tipePesanMasalahBerulang, setTipePesanMasalahBerulang] = useState<"success" | "error" | "info">("info");
+
   const [formValues, setFormValues] = useState<FormValues>({
     username: "",
     password: "",
@@ -199,6 +211,8 @@ export default function AdminPanel() {
         setFilteredMahasiswa([]);
         setMahasiswaTopikFilter("");
         setMahasiswaFilterMessage("");
+        setMahasiswaMasalahBerulang([]);
+        setPesanMasalahBerulang("");
       } else if (tab === "konselor") {
         const response = await api.get<Konselor[]>("/konselors");
         setData((prev) => ({ ...prev, konselor: response.data }));
@@ -212,9 +226,9 @@ export default function AdminPanel() {
       } else if (tab === "session") {
         const response = await api.get<Sesi[]>("/sesi/all");
         setData((prev) => ({ ...prev, session: response.data }));
-      } else if (tab === "Aktifitas") {
+      } else if (tab === "Aktivitas") {
         const response = await api.get("/mahasiswas/aktivitas-terakhir");
-        setData((prev) => ({ ...prev, Aktifitas: response.data }));
+        setData((prev) => ({ ...prev, Aktivitas: response.data }));
       }
       setMessage(`Data ${tab} berhasil dimuat.`);
       setMessageType("success");
@@ -486,7 +500,31 @@ export default function AdminPanel() {
     } finally {
         setLoadingSessionStatusDistribution(false);
     }
-};
+  };
+
+  const fetchMahasiswaMasalahBerulang = async () => {
+    setLoadingMasalahBerulang(true);
+    setPesanMasalahBerulang('');
+    setMahasiswaMasalahBerulang([]);
+    setTipePesanMasalahBerulang("info");
+    try {
+        const response = await api.get<MahasiswaMasalahBerulang[]>('/mahasiswas/masalah-berulang'); // Pastikan endpoint ini benar!
+        setMahasiswaMasalahBerulang(response.data);
+        if (response.data.length === 0) {
+            setPesanMasalahBerulang('Tidak ada mahasiswa dengan masalah berulang ditemukan.');
+            setTipePesanMasalahBerulang("info");
+        } else {
+            setPesanMasalahBerulang(`Ditemukan ${response.data.length} mahasiswa dengan masalah berulang.`);
+            setTipePesanMasalahBerulang("success");
+        }
+    } catch (err: any) {
+        console.error('Error fetching mahasiswa masalah berulang:', err);
+        setPesanMasalahBerulang(err.response?.data?.message || 'Gagal memuat data mahasiswa dengan masalah berulang.');
+        setTipePesanMasalahBerulang("error");
+    } finally {
+        setLoadingMasalahBerulang(false);
+    }
+  };
 
   const openModal = (type: "add" | "edit" | "delete", item: any = null) => {
     setModalType(type);
@@ -1113,14 +1151,75 @@ export default function AdminPanel() {
         )}
 
         {activeTab === "mahasiswa" && (
+          <>
           <div className="mb-4 pb-4 border-b border-gray-200">
             <button
-              onClick={() => setActiveTab("Aktifitas")}
+              onClick={() => setActiveTab("Aktivitas")}
               className="btn-secondary flex items-center gap-2"
             >
               <FaListAlt /> Lihat Laporan Aktivitas Mahasiswa
             </button>
           </div>
+
+          <div className="mb-4 p-4 border rounded-md bg-gray-50 mt-6"> {/* mt-6 untuk jarak dari elemen di atasnya */}
+                <h3 className="text-lg font-semibold mb-2">
+                    Laporan Mahasiswa dengan Masalah Berulang
+                </h3>
+                <div className="flex flex-col md:flex-row md:items-end gap-2">
+                    <button
+                        className="btn-primary mt-2 md:mt-0"
+                        onClick={fetchMahasiswaMasalahBerulang}
+                        disabled={loadingMasalahBerulang}
+                    >
+                        {loadingMasalahBerulang ? "Memuat Laporan..." : "Tampilkan Laporan Masalah Berulang"}
+                    </button>
+                    {(mahasiswaMasalahBerulang.length > 0 || pesanMasalahBerulang) && (
+                        <button
+                            className="btn-secondary ml-2"
+                            onClick={() => {
+                                setMahasiswaMasalahBerulang([]);
+                                setPesanMasalahBerulang("");
+                                setTipePesanMasalahBerulang("info");
+                            }}
+                        >
+                            Reset Laporan
+                        </button>
+                    )}
+                </div>
+
+                {pesanMasalahBerulang && (
+                    <MessageDisplay message={pesanMasalahBerulang} type={tipePesanMasalahBerulang} />
+                )}
+
+                {!loadingMasalahBerulang && mahasiswaMasalahBerulang.length > 0 && (
+                    <div className="overflow-x-auto mt-4">
+                        <h4 className="text-md font-semibold mb-2 text-gray-700">
+                            Hasil Laporan
+                        </h4>
+                        <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                            <thead>
+                                <tr className="bg-gray-100">
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">NRP</th>
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama Mahasiswa</th>
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Topik Sesi Berulang</th>
+                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Jumlah Sesi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {mahasiswaMasalahBerulang.map((item) => (
+                                    <tr key={`${item.nrp}-${item.topik_nama}`} className="hover:bg-gray-50">
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.nrp}</td>
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.nama_mahasiswa}</td>
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.topik_nama}</td>
+                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.jumlah_sesi_dengan_topik}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+          </>
         )}
 
         {/* --- NEW: Filter Mahasiswa berdasarkan Topik --- */}
@@ -2080,7 +2179,7 @@ export default function AdminPanel() {
             </table>
           </div>
         )}
-        {activeTab === "Aktifitas" && (
+        {activeTab === "Aktivitas" && (
           <div className="overflow-x-auto mt-4">
             <table className="min-w-full bg-white border">
               <thead className="bg-gray-50">
@@ -2107,7 +2206,7 @@ export default function AdminPanel() {
                     </td>
                   </tr>
                 ) : (
-                  data.Aktifitas.map((item) => (
+                  data.Aktivitas.map((item) => (
                     <tr key={item.nrp} className="hover:bg-gray-50">
                       <td className="py-2 px-4 border-b">{item.nrp}</td>
                       <td className="py-2 px-4 border-b">{item.nama}</td>

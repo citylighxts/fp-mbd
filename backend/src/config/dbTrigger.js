@@ -1,7 +1,8 @@
-// backend/src/config/dbSetup.js
+// backend/src/config/dbTrigger.js
 
 const db = require('./db'); 
 
+// kapitalisasi nama
 const createTriggerFunctionSQL = `
     CREATE OR REPLACE FUNCTION fn_kapitalisasi_nama()
     RETURNS TRIGGER AS $$
@@ -33,6 +34,7 @@ const createKonselorTriggerSQL = `
     EXECUTE FUNCTION fn_kapitalisasi_nama();
 `;
 
+// jadwal bentrok konselor
 const createJadwalBentrokFunctionSQL = `
     CREATE OR REPLACE FUNCTION cek_jadwal_bentrok_konselor()
     RETURNS TRIGGER AS $$

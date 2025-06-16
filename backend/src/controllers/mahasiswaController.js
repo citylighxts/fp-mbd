@@ -1,6 +1,5 @@
 const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid'); // Make sure you have uuid installed if using for session_id
-const { ViewAktivitasTerakhirMahasiswa } = require('../config/dbView');
 
 // --- Get All Students ---
 const getMahasiswas = async (req, res) => {
@@ -171,10 +170,20 @@ const getMahasiswaByTopik = async (req, res) => {
     }
 };
 
+const getMahasiswaMasalahBerulang = async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM MahasiswaDenganMasalahBerulang');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching Mahasiswa Dengan Masalah Berulang:', error.message);
+        res.status(500).json({ message: 'Gagal mengambil data mahasiswa dengan masalah berulang.', error: error.message });
+    }
+};
+
 const getAktivitasTerakhir = async (req, res) => {
     try {
         // Directly query the view
-        const result = await db.query(`SELECT * FROM ${ViewAktivitasTerakhirMahasiswa};`);
+        const result = await db.query(`SELECT * FROM ViewAktivitasTerakhirMahasiswa;`);
         res.json(result.rows);
     } catch (err) {
         console.error('Error saat mengambil data aktivitas terakhir dari view:', err.message);
@@ -189,5 +198,6 @@ module.exports = {
     updateMahasiswa,
     deleteMahasiswa,
     ajukanSesiKonseling,
+    getMahasiswaMasalahBerulang,
     getAktivitasTerakhir
 };

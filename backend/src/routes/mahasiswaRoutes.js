@@ -1,20 +1,12 @@
 const express = require('express');
-const {
-  getMahasiswas,
-  getMahasiswaByNRP,
-  getMahasiswaByTopik,
-  updateMahasiswa,
-  deleteMahasiswa,
-  ajukanSesiKonseling,
-  getAktivitasTerakhir
-} = require('../controllers/mahasiswaController');
+const router = express.Router();
+const mahasiswaController = require('../controllers/mahasiswaController'); // Import seluruh objek controller
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
-const router = express.Router();
+router.get('/masalah-berulang', protect, authorizeRoles('Admin'), mahasiswaController.getMahasiswaMasalahBerulang);
 
-// Import controller untuk aktivitas terakhir
 router.route('/aktivitas-terakhir')
-    .get(protect, authorizeRoles('Admin'), getAktivitasTerakhir);
+    .get(protect, authorizeRoles('Admin'), mahasiswaController.getAktivitasTerakhir);
 
 // Logging untuk memastikan route dipanggil (debugging)
 router.use((req, res, next) => {
@@ -28,14 +20,14 @@ router.get(
   '/',
   protect,
   authorizeRoles('Admin', 'Mahasiswa'),
-  getMahasiswas
+  mahasiswaController.getMahasiswas
 );
 
 router.get(
   '/by-topik', // This path should come BEFORE /:nrp to avoid conflicts
   protect,
   authorizeRoles('Admin'),
-  getMahasiswaByTopik
+  mahasiswaController.getMahasiswaByTopik
 );
 
 // GET mahasiswa by NRP (admin atau mahasiswa itu sendiri)
@@ -43,7 +35,7 @@ router.get(
   '/:nrp',
   protect,
   authorizeRoles('Admin', 'Mahasiswa'),
-  getMahasiswaByNRP
+  mahasiswaController.getMahasiswaByNRP
 );
 
 // PUT update mahasiswa by NRP (admin atau mahasiswa itu sendiri)
@@ -51,7 +43,7 @@ router.put(
   '/:nrp', // 
   protect,
   authorizeRoles('Admin', 'Mahasiswa'),
-  updateMahasiswa
+  mahasiswaController.updateMahasiswa
 );
 
 // DELETE mahasiswa by NRP (hanya admin)
@@ -64,7 +56,7 @@ router.delete(
   },
   protect,
   authorizeRoles('Admin'),
-  deleteMahasiswa
+  mahasiswaController.deleteMahasiswa
 );
 
 // POST ajukan sesi konseling (hanya mahasiswa)
@@ -72,7 +64,7 @@ router.post(
   '/ajukan-sesi',
   protect,
   authorizeRoles('Mahasiswa'),
-  ajukanSesiKonseling
+  mahasiswaController.ajukanSesiKonseling
 );
 
 module.exports = router;
