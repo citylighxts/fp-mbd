@@ -1,0 +1,71 @@
+Berikut adalah daftar file dan folder yang umumnya diabaikan oleh Git untuk proyek Node.js/Express.js dan Next.js/TypeScript:
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+
+# npm package manager cache
+.npm/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Production build artifacts
+dist/
+build/
+.cache/
+out/ # Jika Next.js di-export sebagai static HTML
+
+# Next.js specific
+.next/
+frontend/.next/
+.swc/ # Cache SWC transpiler
+next-env.d.ts # Ini sering di-generate otomatis, jika Anda sudah punya yang custom atau tidak mau di-generate ulang, bisa dihapus dari sini.
+             # Namun, secara default dari `create-next-app`, ini masuk ke gitignore.
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE-specific directories and files
+.vscode/        # VSCode specific settings
+.idea/          # IntelliJ IDEA specific settings
+*.iml           # IntelliJ IDEA module files
+.DS_Store       # macOS folder metadata
+.classpath
+.project
+.settings/
+.vscodeignore
+
+# SvelteKit specific (if any, though not explicitly used here)
+.svelte-kit/
+.svelte/
+
+# Vercel deployment (if deployed to Vercel)
+.vercel/
+
+# Testing (if using Jest, Cypress, etc.)
+coverage/
+.nyc_output/
+
+# Docker
+Dockerfile.orig # Jika ada Dockerfile yang dihasilkan otomatis
+
+# Miscellaneous
+*.tgz            # tarballs
+.DS_Store
+Thumbs.db
+
+frontend/.next
+
+.qodo
+.vscode
