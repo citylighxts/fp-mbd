@@ -5,11 +5,16 @@ const {
   getMahasiswaByTopik,
   updateMahasiswa,
   deleteMahasiswa,
-  ajukanSesiKonseling
+  ajukanSesiKonseling,
+  getAktivitasTerakhir
 } = require('../controllers/mahasiswaController');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
 const router = express.Router();
+
+// Import controller untuk aktivitas terakhir
+router.route('/aktivitas-terakhir')
+    .get(protect, authorizeRoles('Admin'), getAktivitasTerakhir);
 
 // Logging untuk memastikan route dipanggil (debugging)
 router.use((req, res, next) => {

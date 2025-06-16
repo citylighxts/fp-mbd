@@ -15,6 +15,7 @@ import {
   FaEdit,
   FaPlus,
   FaCheck,
+  FaListAlt,
 } from "react-icons/fa";
 import { User, Admin, Mahasiswa, Konselor, Topik, Sesi } from "../../types"; // Import types
 
@@ -26,6 +27,7 @@ type AdminDataState = {
   konselor: Konselor[];
   topik: Topik[];
   session: Sesi[];
+  Aktifitas: any[];
 };
 
 // Definisikan tipe untuk formValues
@@ -59,14 +61,14 @@ const statusLabels: { [key: string]: string } = {
   Cancelled: "Dibatalkan",
 };
 
-  interface KonselorSessionSummary {
-    konselor_nik: string;
-    konselor_nama: string;
-    konselor_spesialisasi: string;
-    total_sesi_ditangani: number;
-    total_sesi_selesai: number;
-    total_sesi_aktif_pending: number;
-  }
+interface KonselorSessionSummary {
+  konselor_nik: string;
+  konselor_nama: string;
+  konselor_spesialisasi: string;
+  total_sesi_ditangani: number;
+  total_sesi_selesai: number;
+  total_sesi_aktif_pending: number;
+}
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -78,6 +80,7 @@ export default function AdminPanel() {
     konselor: [],
     topik: [],
     session: [],
+    Aktifitas: [],
   });
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -89,17 +92,25 @@ export default function AdminPanel() {
   // NEW: States untuk filter mahasiswa berdasarkan topik
   const [mahasiswaTopikFilter, setMahasiswaTopikFilter] = useState<string>("");
   const [filteredMahasiswa, setFilteredMahasiswa] = useState<Mahasiswa[]>([]); // Mahasiswa[] karena hanya data mahasiswa
-  const [isMahasiswaFiltering, setIsMahasiswaFiltering] = useState<boolean>(false);
-  const [mahasiswaFilterMessage, setMahasiswaFilterMessage] = useState<string>("");
+  const [isMahasiswaFiltering, setIsMahasiswaFiltering] =
+    useState<boolean>(false);
+  const [mahasiswaFilterMessage, setMahasiswaFilterMessage] =
+    useState<string>("");
 
   // NEW: States for konselor filter (konselor tanpa sesi)
   const [filteredKonselor, setFilteredKonselor] = useState<Konselor[]>([]);
-  const [isKonselorFiltering, setIsKonselorFiltering] = useState<boolean>(false);
-  const [konselorFilterMessage, setKonselorFilterMessage] = useState<string>("");
+  const [isKonselorFiltering, setIsKonselorFiltering] =
+    useState<boolean>(false);
+  const [konselorFilterMessage, setKonselorFilterMessage] =
+    useState<string>("");
 
-  const [konselorSessionSummary, setKonselorSessionSummary] = useState<KonselorSessionSummary[]>([]);
-  const [loadingKonselorSummary, setLoadingKonselorSummary] = useState<boolean>(false);
-  const [konselorSummaryMessage, setKonselorSummaryMessage] = useState<string>("");
+  const [konselorSessionSummary, setKonselorSessionSummary] = useState<
+    KonselorSessionSummary[]
+  >([]);
+  const [loadingKonselorSummary, setLoadingKonselorSummary] =
+    useState<boolean>(false);
+  const [konselorSummaryMessage, setKonselorSummaryMessage] =
+    useState<string>("");
 
   // States untuk filter periode sesi selesai
   const [periode, setPeriode] = useState({ start: "", end: "" });
@@ -166,6 +177,9 @@ export default function AdminPanel() {
       } else if (tab === "session") {
         const response = await api.get<Sesi[]>("/sesi/all");
         setData((prev) => ({ ...prev, session: response.data }));
+      } else if (tab === "Aktifitas") {
+        const response = await api.get("/mahasiswas/aktivitas-terakhir");
+        setData((prev) => ({ ...prev, Aktifitas: response.data }));
       }
       setMessage(`Data ${tab} berhasil dimuat.`);
       setMessageType("success");
@@ -236,10 +250,14 @@ export default function AdminPanel() {
       );
       setFilteredMahasiswa(response.data);
       if (response.data.length === 0) {
-        setMahasiswaFilterMessage(`Tidak ada mahasiswa yang ditemukan untuk topik "${mahasiswaTopikFilter}".`);
+        setMahasiswaFilterMessage(
+          `Tidak ada mahasiswa yang ditemukan untuk topik "${mahasiswaTopikFilter}".`
+        );
         setMessageType("info"); // Atau 'warning' jika ada
       } else {
-        setMahasiswaFilterMessage(`Menampilkan ${response.data.length} mahasiswa yang pernah sesi dengan topik "${mahasiswaTopikFilter}".`);
+        setMahasiswaFilterMessage(
+          `Menampilkan ${response.data.length} mahasiswa yang pernah sesi dengan topik "${mahasiswaTopikFilter}".`
+        );
         setMessageType("success");
       }
     } catch (error: any) {
@@ -265,9 +283,13 @@ export default function AdminPanel() {
       const response = await api.get<Konselor[]>("/konselors/tanpa-sesi");
       setFilteredKonselor(response.data);
       if (response.data.length === 0) {
-        setKonselorFilterMessage("Tidak ada konselor yang belum pernah menangani sesi.");
+        setKonselorFilterMessage(
+          "Tidak ada konselor yang belum pernah menangani sesi."
+        );
       } else {
-        setKonselorFilterMessage(`Menampilkan ${response.data.length} konselor yang belum pernah menangani sesi.`);
+        setKonselorFilterMessage(
+          `Menampilkan ${response.data.length} konselor yang belum pernah menangani sesi.`
+        );
       }
       setMessageType("success");
     } catch (error: any) {
@@ -288,20 +310,30 @@ export default function AdminPanel() {
     setMessageType("info"); // Reset message type
 
     try {
-      const response = await api.get<KonselorSessionSummary[]>("/konselors/rekap-sesi");
-      console.log("Data diterima dari backend (Rekap Konselor):", response.data); // Ini PENTING
+      const response = await api.get<KonselorSessionSummary[]>(
+        "/konselors/rekap-sesi"
+      );
+      console.log(
+        "Data diterima dari backend (Rekap Konselor):",
+        response.data
+      ); // Ini PENTING
       setKonselorSessionSummary(response.data);
       if (response.data.length === 0) {
-        setKonselorSummaryMessage("Tidak ada data rekapitulasi sesi konselor ditemukan.");
+        setKonselorSummaryMessage(
+          "Tidak ada data rekapitulasi sesi konselor ditemukan."
+        );
       } else {
-        setKonselorSummaryMessage(`Menampilkan rekapitulasi sesi untuk ${response.data.length} konselor.`);
+        setKonselorSummaryMessage(
+          `Menampilkan rekapitulasi sesi untuk ${response.data.length} konselor.`
+        );
       }
       setMessageType("success");
     } catch (error: any) {
       console.error("Error fetching konselor session summary:", error);
       setKonselorSessionSummary([]);
       setKonselorSummaryMessage(
-        error.response?.data?.message || "Gagal memuat rekapitulasi sesi konselor."
+        error.response?.data?.message ||
+          "Gagal memuat rekapitulasi sesi konselor."
       );
       setMessageType("error");
     } finally {
@@ -909,194 +941,279 @@ export default function AdminPanel() {
           </button>
         )}
 
+        {activeTab === "mahasiswa" && (
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab("Aktifitas")}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <FaListAlt /> Lihat Laporan Aktivitas Mahasiswa
+            </button>
+          </div>
+        )}
+
         {/* --- NEW: Filter Mahasiswa berdasarkan Topik --- */}
         {activeTab === "mahasiswa" && (
-            <div className="mb-4 p-4 border rounded-md bg-gray-50">
-                <h3 className="text-lg font-semibold mb-2">Filter Mahasiswa Berdasarkan Topik Sesi</h3>
-                <div className="flex flex-col md:flex-row md:items-end gap-2">
-                    <div>
-                        <label
-                            htmlFor="mahasiswaTopikFilter"
-                            className="block text-sm font-medium text-gray-700"
-                        >
-                            Nama Topik Sesi:
-                        </label>
-                        <input
-                            id="mahasiswaTopikFilter"
-                            type="text"
-                            className="border rounded px-2 py-1 w-60"
-                            placeholder="Misal: Stres Akademik"
-                            value={mahasiswaTopikFilter}
-                            onChange={(e) => setMahasiswaTopikFilter(e.target.value)}
-                        />
-                    </div>
-                    <button
-                        className="btn-primary mt-2 md:mt-0"
-                        onClick={fetchMahasiswaByTopik}
-                        disabled={isMahasiswaFiltering}
-                    >
-                        {isMahasiswaFiltering ? "Memuat..." : "Tampilkan Mahasiswa"}
-                    </button>
-                    {(filteredMahasiswa.length > 0 || mahasiswaFilterMessage) && (
-                        <button
-                            className="btn-secondary ml-2"
-                            onClick={() => {
-                                setFilteredMahasiswa([]);
-                                setMahasiswaTopikFilter("");
-                                setMahasiswaFilterMessage("");
-                                setMessageType("info"); // Bersihkan pesan umum juga
-                                fetchData("mahasiswa"); // Muat ulang semua data mahasiswa
-                            }}
-                        >
-                            Reset Filter
-                        </button>
-                    )}
-                </div>
-                {mahasiswaFilterMessage && (
-                     <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                        {mahasiswaFilterMessage}
-                    </div>
-                )}
-
-                {!isMahasiswaFiltering && filteredMahasiswa.length > 0 && (
-                    <div className="overflow-x-auto mt-4">
-                        <h4 className="text-md font-semibold mb-2">Hasil Filter Mahasiswa</h4>
-                        <table className="min-w-full bg-white border border-gray-200 rounded-md">
-                            <thead>
-                                <tr className="bg-gray-100">
-                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">NRP</th>
-                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama</th>
-                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Departemen</th>
-                                    <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Kontak</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredMahasiswa.map((item) => (
-                                    <tr key={item.nrp} className="hover:bg-gray-50">
-                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.nrp}</td>
-                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.nama}</td>
-                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.departemen}</td>
-                                        <td className="py-2 px-4 border-b text-sm text-gray-800">{item.kontak}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+          <div className="mb-4 p-4 border rounded-md bg-gray-50">
+            <h3 className="text-lg font-semibold mb-2">
+              Filter Mahasiswa Berdasarkan Topik Sesi
+            </h3>
+            <div className="flex flex-col md:flex-row md:items-end gap-2">
+              <div>
+                <label
+                  htmlFor="mahasiswaTopikFilter"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Nama Topik Sesi:
+                </label>
+                <input
+                  id="mahasiswaTopikFilter"
+                  type="text"
+                  className="border rounded px-2 py-1 w-60"
+                  placeholder="Misal: Stres Akademik"
+                  value={mahasiswaTopikFilter}
+                  onChange={(e) => setMahasiswaTopikFilter(e.target.value)}
+                />
+              </div>
+              <button
+                className="btn-primary mt-2 md:mt-0"
+                onClick={fetchMahasiswaByTopik}
+                disabled={isMahasiswaFiltering}
+              >
+                {isMahasiswaFiltering ? "Memuat..." : "Tampilkan Mahasiswa"}
+              </button>
+              {(filteredMahasiswa.length > 0 || mahasiswaFilterMessage) && (
+                <button
+                  className="btn-secondary ml-2"
+                  onClick={() => {
+                    setFilteredMahasiswa([]);
+                    setMahasiswaTopikFilter("");
+                    setMahasiswaFilterMessage("");
+                    setMessageType("info"); // Bersihkan pesan umum juga
+                    fetchData("mahasiswa"); // Muat ulang semua data mahasiswa
+                  }}
+                >
+                  Reset Filter
+                </button>
+              )}
             </div>
+            {mahasiswaFilterMessage && (
+              <div
+                className={`mt-2 text-sm ${
+                  messageType === "error" ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                {mahasiswaFilterMessage}
+              </div>
+            )}
+
+            {!isMahasiswaFiltering && filteredMahasiswa.length > 0 && (
+              <div className="overflow-x-auto mt-4">
+                <h4 className="text-md font-semibold mb-2">
+                  Hasil Filter Mahasiswa
+                </h4>
+                <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        NRP
+                      </th>
+                      <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Nama
+                      </th>
+                      <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Departemen
+                      </th>
+                      <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                        Kontak
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMahasiswa.map((item) => (
+                      <tr key={item.nrp} className="hover:bg-gray-50">
+                        <td className="py-2 px-4 border-b text-sm text-gray-800">
+                          {item.nrp}
+                        </td>
+                        <td className="py-2 px-4 border-b text-sm text-gray-800">
+                          {item.nama}
+                        </td>
+                        <td className="py-2 px-4 border-b text-sm text-gray-800">
+                          {item.departemen}
+                        </td>
+                        <td className="py-2 px-4 border-b text-sm text-gray-800">
+                          {item.kontak}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
         {/* --- END NEW FILTER MAHASISWA --- */}
 
-            {activeTab === "konselor" && (
-            // Outer container for all counselor-related filters/reports
-            <div className="mb-4 p-4 border rounded-md bg-gray-50">
-                <h3 className="text-lg font-semibold mb-4">Filter dan Rekap Konselor</h3> {/* Unified heading */}
-
-                {/* --- Filter Konselor Tanpa Sesi --- */}
-                {/* Wrapped for better logical grouping */}
-                <div className="mb-4 pb-4 border-b border-gray-200"> {/* Added border-b for separation */}
-                    <h4 className="text-md font-semibold mb-2">Konselor Tanpa Sesi</h4>
-                    <div className="flex flex-col md:flex-row md:items-end gap-2">
-                        <button
-                            className="btn-primary mt-2 md:mt-0"
-                            onClick={fetchKonselorTanpaSesi}
-                            disabled={isKonselorFiltering}
-                        >
-                            {isKonselorFiltering ? "Memuat..." : "Tampilkan Konselor Tanpa Sesi"}
-                        </button>
-                        {(filteredKonselor.length > 0 || konselorFilterMessage) && (
-                            <button
-                                className="btn-secondary ml-2"
-                                onClick={() => {
-                                    setFilteredKonselor([]);
-                                    setKonselorFilterMessage("");
-                                    setMessage(""); // Clear general message
-                                    fetchData("konselor"); // Reload all konselor data
-                                }}
-                            >
-                                Reset Filter
-                            </button>
-                        )}
-                    </div>
-                    {konselorFilterMessage && (
-                        <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                            {konselorFilterMessage}
-                        </div>
-                    )}
+        {activeTab === "konselor" && (
+          // Outer container for all counselor-related filters/reports
+          <div className="mb-4 p-4 border rounded-md bg-gray-50">
+            <h3 className="text-lg font-semibold mb-4">
+              Filter dan Rekap Konselor
+            </h3>{" "}
+            {/* Unified heading */}
+            {/* --- Filter Konselor Tanpa Sesi --- */}
+            {/* Wrapped for better logical grouping */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              {" "}
+              {/* Added border-b for separation */}
+              <h4 className="text-md font-semibold mb-2">
+                Konselor Tanpa Sesi
+              </h4>
+              <div className="flex flex-col md:flex-row md:items-end gap-2">
+                <button
+                  className="btn-primary mt-2 md:mt-0"
+                  onClick={fetchKonselorTanpaSesi}
+                  disabled={isKonselorFiltering}
+                >
+                  {isKonselorFiltering
+                    ? "Memuat..."
+                    : "Tampilkan Konselor Tanpa Sesi"}
+                </button>
+                {(filteredKonselor.length > 0 || konselorFilterMessage) && (
+                  <button
+                    className="btn-secondary ml-2"
+                    onClick={() => {
+                      setFilteredKonselor([]);
+                      setKonselorFilterMessage("");
+                      setMessage(""); // Clear general message
+                      fetchData("konselor"); // Reload all konselor data
+                    }}
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+              {konselorFilterMessage && (
+                <div
+                  className={`mt-2 text-sm ${
+                    messageType === "error" ? "text-red-600" : "text-green-600"
+                  }`}
+                >
+                  {konselorFilterMessage}
                 </div>
-                {/* --- END Filter Konselor Tanpa Sesi --- */}
-
-                {/* --- Rekapitulasi Jumlah Sesi Konselor --- */}
-                <div className="mt-4">
-                    <h4 className="text-md font-semibold mb-2">Rekapitulasi Jumlah Sesi Konselor</h4>
-                    <div className="flex flex-col md:flex-row md:items-end gap-2">
-                        <button
-                            className="btn-primary mt-2 md:mt-0"
-                            onClick={fetchKonselorSessionSummary}
-                            disabled={loadingKonselorSummary}
-                        >
-                            {loadingKonselorSummary ? "Memuat Rekap..." : "Tampilkan Rekap Sesi Konselor"}
-                        </button>
-                        {(konselorSessionSummary.length > 0 || konselorSummaryMessage) && (
-                            <button
-                                className="btn-secondary ml-2"
-                                onClick={() => {
-                                    setKonselorSessionSummary([]);
-                                    setKonselorSummaryMessage("");
-                                    setMessageType("info");
-                                }}
-                            >
-                                Reset Rekap
-                            </button>
-                        )}
-                    </div>
-                    {konselorSummaryMessage && (
-                        <div className={`mt-2 text-sm ${messageType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                            {konselorSummaryMessage}
-                        </div>
-                    )}
-                    {/* === PASTIKAN KONDISI INI BENAR === */}
-                    {!loadingKonselorSummary && konselorSessionSummary.length > 0 && (
-                        <div className="overflow-x-auto mt-4">
-                            <h5 className="text-md font-semibold mb-2 text-gray-700">Hasil Rekapitulasi</h5>
-                            <table className="min-w-full bg-white border border-gray-200 rounded-md">
-                                <thead>
-                                    <tr className="bg-gray-100">
-                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">NIK</th>
-                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Nama Konselor</th>
-                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Spesialisasi</th>
-                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Total Sesi</th>
-                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Sesi Selesai</th>
-                                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Sesi Aktif/Pending</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {konselorSessionSummary.map((item) => (
-                                        <tr key={item.konselor_nik} className="hover:bg-gray-50">
-                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_nik}</td>
-                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_nama}</td>
-                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.konselor_spesialisasi}</td>
-                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.total_sesi_ditangani}</td>
-                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.total_sesi_selesai}</td>
-                                            <td className="py-2 px-4 border-b text-sm text-gray-800">{item.total_sesi_aktif_pending}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    {/* === AKHIR KONDISI INI === */}
-                </div>
-                {/* --- END Rekapitulasi Jumlah Sesi Konselor --- */}
-
+              )}
             </div>
+            {/* --- END Filter Konselor Tanpa Sesi --- */}
+            {/* --- Rekapitulasi Jumlah Sesi Konselor --- */}
+            <div className="mt-4">
+              <h4 className="text-md font-semibold mb-2">
+                Rekapitulasi Jumlah Sesi Konselor
+              </h4>
+              <div className="flex flex-col md:flex-row md:items-end gap-2">
+                <button
+                  className="btn-primary mt-2 md:mt-0"
+                  onClick={fetchKonselorSessionSummary}
+                  disabled={loadingKonselorSummary}
+                >
+                  {loadingKonselorSummary
+                    ? "Memuat Rekap..."
+                    : "Tampilkan Rekap Sesi Konselor"}
+                </button>
+                {(konselorSessionSummary.length > 0 ||
+                  konselorSummaryMessage) && (
+                  <button
+                    className="btn-secondary ml-2"
+                    onClick={() => {
+                      setKonselorSessionSummary([]);
+                      setKonselorSummaryMessage("");
+                      setMessageType("info");
+                    }}
+                  >
+                    Reset Rekap
+                  </button>
+                )}
+              </div>
+              {konselorSummaryMessage && (
+                <div
+                  className={`mt-2 text-sm ${
+                    messageType === "error" ? "text-red-600" : "text-green-600"
+                  }`}
+                >
+                  {konselorSummaryMessage}
+                </div>
+              )}
+              {/* === PASTIKAN KONDISI INI BENAR === */}
+              {!loadingKonselorSummary && konselorSessionSummary.length > 0 && (
+                <div className="overflow-x-auto mt-4">
+                  <h5 className="text-md font-semibold mb-2 text-gray-700">
+                    Hasil Rekapitulasi
+                  </h5>
+                  <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          NIK
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Nama Konselor
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Spesialisasi
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Total Sesi
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Sesi Selesai
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Sesi Aktif/Pending
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {konselorSessionSummary.map((item) => (
+                        <tr
+                          key={item.konselor_nik}
+                          className="hover:bg-gray-50"
+                        >
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {item.konselor_nik}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {item.konselor_nama}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {item.konselor_spesialisasi}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {item.total_sesi_ditangani}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {item.total_sesi_selesai}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {item.total_sesi_aktif_pending}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {/* === AKHIR KONDISI INI === */}
+            </div>
+            {/* --- END Rekapitulasi Jumlah Sesi Konselor --- */}
+          </div>
         )}
 
         {activeTab === "session" && (
           <>
             {/* --- FILTER SPESIALISASI KONSELOR --- */}
             <div className="mb-4 p-4 border rounded-md bg-gray-50">
-              <h3 className="text-lg font-semibold mb-2">Filter Sesi Berdasarkan Spesialisasi Konselor</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Filter Sesi Berdasarkan Spesialisasi Konselor
+              </h3>
               <div className="flex flex-col md:flex-row md:items-end gap-2">
                 <div>
                   <label
@@ -1139,10 +1256,15 @@ export default function AdminPanel() {
 
             {/* --- REKAP SESI SELESAI PERIODE --- */}
             <div className="mb-4 p-4 border rounded-md bg-gray-50">
-              <h3 className="text-lg font-semibold mb-2">Rekap Sesi Selesai per Periode</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Rekap Sesi Selesai per Periode
+              </h3>
               <div className="flex flex-col md:flex-row gap-2 md:items-end">
                 <div>
-                  <label htmlFor="periodeStart" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="periodeStart"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Periode Mulai:
                   </label>
                   <input
@@ -1156,7 +1278,10 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="periodeEnd" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="periodeEnd"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Periode Akhir:
                   </label>
                   <input
@@ -1174,7 +1299,9 @@ export default function AdminPanel() {
                   onClick={fetchSesiSelesai}
                   disabled={loadingSelesai}
                 >
-                  {loadingSelesai ? "Memuat Rekap..." : "Tampilkan Rekap Sesi Selesai"}
+                  {loadingSelesai
+                    ? "Memuat Rekap..."
+                    : "Tampilkan Rekap Sesi Selesai"}
                 </button>
               </div>
 
@@ -1184,37 +1311,68 @@ export default function AdminPanel() {
 
               {!loadingSelesai && sesiSelesai.length > 0 && (
                 <div className="overflow-x-auto mt-4">
-                  <h4 className="text-md font-semibold mb-2">Hasil Rekap Sesi Selesai</h4>
+                  <h4 className="text-md font-semibold mb-2">
+                    Hasil Rekap Sesi Selesai
+                  </h4>
                   <table className="min-w-full bg-white border border-gray-200 rounded-md">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">ID Sesi</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Tanggal</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Status</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Mahasiswa</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Konselor</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Topik</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Catatan</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          ID Sesi
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Tanggal
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Status
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Mahasiswa
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Konselor
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Topik
+                        </th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Catatan
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {sesiSelesai.map((sesi) => (
                         <tr key={sesi.sesi_id} className="hover:bg-gray-50">
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.sesi_id}</td>
                           <td className="py-2 px-4 border-b text-sm text-gray-800">
-                            {new Date(sesi.tanggal).toLocaleDateString("id-ID", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                            {sesi.sesi_id}
                           </td>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{statusLabels[sesi.status] || sesi.status}</td>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.nama_mahasiswa}</td>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.nama_konselor}</td>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.nama_topik}</td>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{sesi.catatan || '-'}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {new Date(sesi.tanggal).toLocaleDateString(
+                              "id-ID",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {statusLabels[sesi.status] || sesi.status}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {sesi.nama_mahasiswa}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {sesi.nama_konselor}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {sesi.nama_topik}
+                          </td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">
+                            {sesi.catatan || "-"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1259,22 +1417,23 @@ export default function AdminPanel() {
                       </th>
                     </>
                   )}
-                  {activeTab === "mahasiswa" && filteredMahasiswa.length === 0 && (
-                    <>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        NRP
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Nama
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Departemen
-                      </th>
-                      <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                        Kontak
-                      </th>
-                    </>
-                  )}
+                  {activeTab === "mahasiswa" &&
+                    filteredMahasiswa.length === 0 && (
+                      <>
+                        <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          NRP
+                        </th>
+                        <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Nama
+                        </th>
+                        <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Departemen
+                        </th>
+                        <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Kontak
+                        </th>
+                      </>
+                    )}
                   {activeTab === "konselor" && (
                     <>
                       <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
@@ -1358,11 +1517,13 @@ export default function AdminPanel() {
                     </>
                   )}
                   {/* Kolom Aksi hanya tampil jika tidak sedang memfilter Mahasiswa */}
-                  {activeTab !== "mahasiswa" || (activeTab === "mahasiswa" && filteredMahasiswa.length === 0) && (
-                    <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
-                      Aksi
-                    </th>
-                  )}
+                  {activeTab !== "mahasiswa" ||
+                    (activeTab === "mahasiswa" &&
+                      filteredMahasiswa.length === 0 && (
+                        <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                          Aksi
+                        </th>
+                      ))}
                 </tr>
               </thead>
               <tbody>
@@ -1385,8 +1546,8 @@ export default function AdminPanel() {
                         >
                           <FaTrash />
                         </button>
-                        </td>
-                      </tr>
+                      </td>
+                    </tr>
                   ))}
                 {activeTab === "admin" &&
                   data.admin.map((item) => (
@@ -1412,7 +1573,8 @@ export default function AdminPanel() {
                       </td>
                     </tr>
                   ))}
-                {activeTab === "mahasiswa" && filteredMahasiswa.length === 0 && (
+                {activeTab === "mahasiswa" &&
+                  filteredMahasiswa.length === 0 &&
                   // Tampilkan semua mahasiswa jika tidak ada filter aktif
                   data.mahasiswa.map((item) => (
                     <tr key={item.nrp}>
@@ -1435,9 +1597,8 @@ export default function AdminPanel() {
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
-                {activeTab === "konselor" && (
+                  ))}
+                {activeTab === "konselor" &&
                   // Conditional rendering based on whether filtering is active and has results
                   (isKonselorFiltering || filteredKonselor.length > 0
                     ? filteredKonselor
@@ -1465,8 +1626,7 @@ export default function AdminPanel() {
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
+                  ))}
                 {activeTab === "topik" &&
                   data.topik.map((item) => (
                     <tr key={item.topik_id}>
@@ -1488,7 +1648,8 @@ export default function AdminPanel() {
                       </td>
                     </tr>
                   ))}
-                {activeTab === "session" && filteredsession.length === 0 && (
+                {activeTab === "session" &&
+                  filteredsession.length === 0 &&
                   // Tampilkan semua sesi jika tidak ada filter spesialisasi aktif
                   data.session.map((item) => (
                     <tr key={item.sesi_id}>
@@ -1511,9 +1672,7 @@ export default function AdminPanel() {
                       <td className="py-2 px-4 border-b">
                         {item.konselor_nama}
                       </td>
-                      <td className="py-2 px-4 border-b">
-                        {item.topik_nama}
-                      </td>
+                      <td className="py-2 px-4 border-b">{item.topik_nama}</td>
                       <td className="py-2 px-4 border-b">
                         {item.catatan || "-"}
                       </td>
@@ -1532,9 +1691,9 @@ export default function AdminPanel() {
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
-                {activeTab === "session" && filteredsession.length > 0 && (
+                  ))}
+                {activeTab === "session" &&
+                  filteredsession.length > 0 &&
                   // Tampilkan sesi yang difilter berdasarkan spesialisasi
                   filteredsession.map((item) => (
                     <tr key={item.sesi_id}>
@@ -1547,7 +1706,7 @@ export default function AdminPanel() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                          </td>
+                      </td>
                       <td className="py-2 px-4 border-b">
                         {statusLabels[item.status] || item.status}
                       </td>
@@ -1557,29 +1716,76 @@ export default function AdminPanel() {
                       <td className="py-2 px-4 border-b">
                         {item.konselor_nama}
                       </td>
-                      <td className="py-2 px-4 border-b">
-                        {item.topik_nama}
-                      </td>
+                      <td className="py-2 px-4 border-b">{item.topik_nama}</td>
                       <td className="py-2 px-4 border-b">
                         {item.catatan || "-"}
                       </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          <button
-                            onClick={() => openModal("edit", item)}
-                            className="text-blue-600 hover:text-blue-800 mr-2"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal("delete", item)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FaTrash />
-                          </button>
-                        </td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <button
+                          onClick={() => openModal("edit", item)}
+                          className="text-blue-600 hover:text-blue-800 mr-2"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal("delete", item)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {activeTab === "Aktifitas" && (
+          <div className="overflow-x-auto mt-4">
+            <table className="min-w-full bg-white border">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                    NRP
+                  </th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                    Nama Mahasiswa
+                  </th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                    Departemen
+                  </th>
+                  <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">
+                    Tanggal Sesi Terakhir
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={4}>
+                      <LoadingSpinner />
+                    </td>
+                  </tr>
+                ) : (
+                  data.Aktifitas.map((item) => (
+                    <tr key={item.nrp} className="hover:bg-gray-50">
+                      <td className="py-2 px-4 border-b">{item.nrp}</td>
+                      <td className="py-2 px-4 border-b">{item.nama}</td>
+                      <td className="py-2 px-4 border-b">{item.departemen}</td>
+                      <td className="py-2 px-4 border-b">
+                        {item.tanggal_sesi_terakhir ? (
+                          new Date(item.tanggal_sesi_terakhir).toLocaleString(
+                            "id-ID"
+                          )
+                        ) : (
+                          <span className="text-gray-400 italic">
+                            Belum pernah sesi
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))
-                      )}
+                )}
               </tbody>
             </table>
           </div>
@@ -1591,9 +1797,7 @@ export default function AdminPanel() {
           <div className="bg-white p-6 rounded-lg shadow-xl w-11/12 md:w-1/2 lg:w-1/3">
             <h2 className="text-2xl font-bold mb-4">
               {modalType === "add"
-                ? `Tambah ${
-                    activeTab === "users" ? "Pengguna" : "Topik"
-                  }`
+                ? `Tambah ${activeTab === "users" ? "Pengguna" : "Topik"}`
                 : modalType === "edit"
                 ? `Edit ${
                     activeTab === "users"

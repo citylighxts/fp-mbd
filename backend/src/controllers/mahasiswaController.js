@@ -170,11 +170,35 @@ const getMahasiswaByTopik = async (req, res) => {
     }
 };
 
+const getAktivitasTerakhir = async (req, res) => {
+    try {
+        const ViewAktifitasTerakhirMahasiswa = `
+            SELECT
+                m.nrp,
+                m.nama,
+                m.departemen,
+                MAX(s.tanggal) AS tanggal_sesi_terakhir
+            FROM mahasiswa m
+            LEFT JOIN sesi s ON m.nrp = s.mahasiswa_nrp
+            GROUP BY m.nrp, m.nama, m.departemen
+            ORDER BY tanggal_sesi_terakhir DESC NULLS LAST;
+        `;
+        
+        const result = await db.query(ViewAktifitasTerakhirMahasiswa);
+        res.json(result.rows);
+
+    } catch (err) {
+        console.error('Error saat mengambil data aktivitas terakhir:', err.message);
+        res.status(500).send('Kesalahan server');
+    }
+};
+
 module.exports = {
     getMahasiswas,
     getMahasiswaByNRP,
     getMahasiswaByTopik,
     updateMahasiswa,
     deleteMahasiswa,
-    ajukanSesiKonseling
+    ajukanSesiKonseling,
+    getAktivitasTerakhir
 };
