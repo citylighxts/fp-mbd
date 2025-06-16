@@ -5,7 +5,8 @@ require('dotenv').config();
 
 // Import your database connection pool
 const db = require('./config/db'); // Ensure this path is correct
-const { initializeTriggers } = require('./config/dbSetup');
+const { initializeTriggers } = require('./config/dbTrigger');
+const { createViews } = require('./config/dbView');
 
 // Import your route modules
 const authRoutes = require('./routes/authRoutes');
@@ -61,6 +62,7 @@ app.listen(PORT, async () => {
         console.log('Semua database views berhasil diinisialisasi.');
 
         await initializeTriggers();
+        await createViews();
 
     } catch (error) {
         console.error('Gagal terhubung ke database atau menginisialisasi views:', error.message);
