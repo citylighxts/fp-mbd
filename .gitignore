@@ -66,3 +66,4 @@ Dockerfile.orig # Jika ada Dockerfile yang dihasilkan otomatis
 .DS_Store
 Thumbs.db
 
+frontend/.next/
